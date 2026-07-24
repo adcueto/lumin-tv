@@ -1,0 +1,18 @@
+title=Lumin TV
+major_version=5
+minor_version=1
+build_version=56
+
+mm_icon_focus_hd=pkg:/images/mm_icon_focus_hd.png
+mm_icon_focus_sd=pkg:/images/mm_icon_focus_sd.png
+
+splash_screen_fhd=pkg:/images/splash_fhd.png
+splash_screen_hd=pkg:/images/splash_hd.png
+splash_screen_sd=pkg:/images/splash_sd.png
+
+splash_color=#EC407A
+splash_min_time=1000
+
+ui_resolutions=fhd
+
+rsg_version=1.3

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="PlaylistTask" extends="Task">
+    <script type="text/brightscript" uri="pkg:/components/PlaylistTask.brs" />
+
+    <interface>
+        <field id="serverUrl" type="string" alwaysNotify="true" />
+        <field id="saveUrl" type="string" alwaysNotify="true" />
+        <field id="playlistJson" type="string" />
+        <field id="errorMsg" type="string" />
+    </interface>
+</component>

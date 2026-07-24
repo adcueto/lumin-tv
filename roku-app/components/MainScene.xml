@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="MainScene" extends="Scene">
+    <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+
+    <children>
+        <Rectangle id="fondo" width="1920" height="1080" color="0x000000FF" />
+
+        <Video id="video" width="1920" height="1080" translation="[0,0]" />
+
+        <Poster id="foto" visible="false" loadDisplayMode="scaleToFit" />
+
+        <Poster id="fotoB" visible="false" loadDisplayMode="scaleToFit" />
+
+        <Label id="estado"
+            translation="[960, 540]"
+            horizAlign="center"
+            vertAlign="center"
+            font="font:MediumSystemFont"
+            color="0xCCCCCCFF"
+            text="" />
+
+        <Label id="codigo"
+            horizAlign="center"
+            vertAlign="center"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+            text="" />
+
+        <Label id="ayuda"
+            translation="[960, 1020]"
+            horizAlign="center"
+            font="font:SmallestSystemFont"
+            color="0x888888FF"
+            text="" />
+
+        <Group id="barra" visible="false">
+            <Rectangle id="barraFondo" color="0x000000D9" />
+            <Label id="barraTexto"
+                vertAlign="center"
+                horizAlign="center"
+                font="font:MediumBoldSystemFont"
+                color="0xFFFFFFFF"
+                wrap="false"
+                text="" />
+        </Group>
+
+        <Group id="turno" visible="false">
+            <Group id="tPanel">
+                <Rectangle id="tFondoPanel" color="0x101010FF" />
+                <Rectangle id="tLinea" color="0xEC5A96FF" />
+                <Label id="tTitulo" text="TURNO" horizAlign="center" vertAlign="center" color="0xEC5A96FF" />
+                <Label id="tNumero" horizAlign="center" vertAlign="center" color="0xFFFFFFFF" />
+                <Label id="tEstacion" horizAlign="center" vertAlign="center" color="0xEC5A96FF" />
+                <Rectangle id="tDivisor" color="0x464646FF" />
+                <Label id="tAntTit" text="PRÓXIMOS" horizAlign="center" vertAlign="center" color="0xEC5A96FF" />
+                <Label id="tAntNums" horizAlign="left" vertAlign="top" color="0xFFFFFFFF" wrap="true" maxLines="3" />
+                <Label id="tAntEsts" horizAlign="right" vertAlign="top" color="0xD2D2D2FF" wrap="true" maxLines="3" />
+                <Rectangle id="tFooter" color="0x1C1C1CFF" />
+                <Label id="tEspera" horizAlign="center" vertAlign="center" color="0xFFFFFFFF" />
+            </Group>
+        </Group>
+
+        <Animation id="tAnimIn" duration="0.5" easeFunction="outCubic" repeat="false">
+            <Vector2DFieldInterpolator id="tInterpIn" key="[0.0, 1.0]" fieldToInterp="tPanel.translation" />
+        </Animation>
+        <Animation id="tAnimOut" duration="0.5" easeFunction="inCubic" repeat="false">
+            <Vector2DFieldInterpolator id="tInterpOut" key="[0.0, 1.0]" fieldToInterp="tPanel.translation" />
+        </Animation>
+    </children>
+</component>

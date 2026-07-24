@@ -1,0 +1,9 @@
+{
+  "tvs": ["192.168.1.101", "192.168.1.102", "192.168.1.103"],
+  "abre": "09:55",
+  "cierra": "20:05",
+  "dias": [0, 1, 2, 3, 4, 5, 6],
+  "nombre_app": "lumin",
+  "apagar_al_cierre": true,
+  "intervalo_seg": 120
+}
