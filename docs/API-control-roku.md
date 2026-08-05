@@ -11,19 +11,20 @@ recepción o Raspberry) debe estar en la MISMA red WiFi/LAN que las TVs.
 
 | Dato | Valor |
 |------|-------|
-| ID del canal LUMIN TV (tienda) | `782875` |
+| ID del canal LUMIN TV (tienda) | `874086` (verificado contra TV el 05/08/2026) |
 | Puerto ECP de Roku | `8060` |
 | ID si la TV tiene versión sideload | `dev` |
 
-El ID `782875` es el mismo en todas las TVs, porque es el identificador del
+El ID `874086` es el mismo en todas las TVs, porque es el identificador del
 canal en la tienda de Roku. Lo que cambia por pantalla es la IP.
 
 ## Preparación de cada TV (una vez, con el control remoto)
 
 1. Configuración → Sistema → Energía → **Inicio rápido: ACTIVADO**.
    Sin esto, una TV dormida no responde a comandos de red.
-2. Configuración → Sistema → Avanzado → Control por apps móviles →
-   **Acceso de red: Predeterminado**.
+2. Configuración → Sistema → Configuración avanzada del sistema → Control por
+   apps móviles → **Acceso de red: Permisivo**. Si queda en otro valor, la TV
+   responde `ECP command not allowed in Limited mode` y rechaza los comandos.
 3. Reservar la IP de la TV en el módem (reservación DHCP por MAC) para que no
    cambie con el tiempo. La IP actual se ve en Configuración → Red → Acerca de.
 
@@ -35,7 +36,7 @@ Base: `http://{IP_TV}:8060`
 |--------|--------|------|
 | Encender | POST | `/keypress/PowerOn` |
 | Apagar | POST | `/keypress/PowerOff` |
-| Abrir LUMIN TV | POST | `/launch/782875` |
+| Abrir LUMIN TV | POST | `/launch/874086` |
 | Listar apps instaladas | GET | `/query/apps` |
 | Ver app activa | GET | `/query/active-app` |
 | Info del dispositivo | GET | `/query/device-info` |
@@ -50,8 +51,8 @@ directo, el comando se pierde.
 
 ```
 POST /keypress/PowerOn      → esperar 3 s
-GET  /query/active-app      → ¿ya está el canal 782875?
-POST /launch/782875         → solo si no lo está
+GET  /query/active-app      → ¿ya está el canal 874086?
+POST /launch/874086         → solo si no lo está
 ```
 
 Ejemplo con curl (una TV):
@@ -60,7 +61,7 @@ Ejemplo con curl (una TV):
 IP=192.168.1.45
 curl -m 4 -d '' http://$IP:8060/keypress/PowerOn
 sleep 3
-curl -m 4 -d '' http://$IP:8060/launch/782875
+curl -m 4 -d '' http://$IP:8060/launch/874086
 # verificar
 curl -m 4 http://$IP:8060/query/active-app
 ```
@@ -72,7 +73,7 @@ import time, urllib.request
 
 TVS = ["192.168.1.45", "192.168.1.46", "192.168.1.47",
        "192.168.1.48", "192.168.1.49"]
-CANAL = "782875"
+CANAL = "874086"
 
 def ecp(ip, ruta):
     req = urllib.request.Request(f"http://{ip}:8060/{ruta}",
