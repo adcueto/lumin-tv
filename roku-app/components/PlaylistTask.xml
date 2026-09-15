@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <component name="PlaylistTask" extends="Task">
     <script type="text/brightscript" uri="pkg:/components/PlaylistTask.brs" />
-
+    <script type="text/brightscript" uri="pkg:/components/Cache.brs" />
     <interface>
         <field id="serverUrl" type="string" alwaysNotify="true" />
         <field id="saveUrl" type="string" alwaysNotify="true" />
         <field id="playlistJson" type="string" />
         <field id="errorMsg" type="string" />
+        <!-- B1: estado de red con histeresis y hora de la ultima respuesta buena -->
+        <field id="conectado" type="boolean" value="true" />
+        <field id="ultimaSincronizacion" type="string" value="" />
+        <!-- true cuando playlistJson viene de la copia local y no del servidor -->
+        <field id="desdeCache" type="boolean" value="false" />
     </interface>
 </component>

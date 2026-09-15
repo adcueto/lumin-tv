@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <component name="MainScene" extends="Scene">
     <script type="text/brightscript" uri="pkg:/components/MainScene.brs" />
+    <script type="text/brightscript" uri="pkg:/components/Cache.brs" />
 
     <children>
         <Rectangle id="fondo" width="1920" height="1080" color="0x000000FF" />
@@ -10,6 +11,21 @@
         <Poster id="foto" visible="false" loadDisplayMode="scaleToFit" />
 
         <Poster id="fotoB" visible="false" loadDisplayMode="scaleToFit" />
+
+        <!-- B1: capa de continuidad. Se orienta igual que las fotos, asi que
+             sus hijos se colocan en coordenadas de la pantalla FISICA
+             (vertical: 1080 de ancho por 1920 de alto). -->
+        <Group id="capaEstado">
+            <Poster id="respaldo" visible="false" loadDisplayMode="scaleToFit" />
+            <Label id="detalle"
+                visible="false"
+                horizAlign="left"
+                vertAlign="center"
+                font="font:SmallestSystemFont"
+                color="0x96969BFF"
+                text="" />
+            <Poster id="indicador" visible="false" uri="pkg:/images/punto_ambar.png" />
+        </Group>
 
         <Label id="estado"
             translation="[960, 540]"

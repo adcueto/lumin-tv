@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="CacheTask" extends="Task">
+    <script type="text/brightscript" uri="pkg:/components/CacheTask.brs" />
+    <script type="text/brightscript" uri="pkg:/components/Cache.brs" />
+    <interface>
+        <!-- Entrada: lista de {url, nombre} que la escena quiere tener en cache.
+             Se reemplaza completa en cada playlist; la tarea descarga en orden
+             y de UNA en UNA para no competir con la reproduccion. -->
+        <field id="deseados" type="assocarray" alwaysNotify="true" />
+        <!-- Salida: {url, ruta} cada vez que un archivo queda listo en cachefs -->
+        <field id="listo" type="assocarray" alwaysNotify="true" />
+        <!-- Salida: {url, motivo} cuando una descarga se descarta -->
+        <field id="fallo" type="assocarray" alwaysNotify="true" />
+        <!-- Salida: total de bytes actualmente en cache, para diagnostico -->
+        <field id="bytesEnCache" type="integer" value="0" />
+    </interface>
+</component>

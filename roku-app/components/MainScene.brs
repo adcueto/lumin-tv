@@ -1,3 +1,17 @@
+' MainScene — LUMIN TV
+'
+' B1 (continuidad y recuperacion) anade, sin tocar el contrato con el servidor:
+'   - vigilante del estado "buffering": ya no se queda cargando sin fin;
+'   - contador de fallos con histeresis: tras una vuelta completa sin nada
+'     reproducible se muestra la lamina de respaldo y se reintenta cada vez
+'     mas despacio (10, 20, 40, 60 s), nunca en bucle apretado;
+'   - archivos danados: se apartan 10 minutos sin detener el resto de la lista;
+'   - cache en cachefs: lo que ya se reprodujo sirve si se cae la red;
+'   - turnos vencidos: no se anuncian al recuperar la conexion;
+'   - comandos "reproducir" emitidos durante una desconexion no se ejecutan
+'     tarde; los comandos de estado (pausa, silencio) si se aplican;
+'   - la clienta nunca ve mensajes tecnicos: solo la lamina y un punto ambar.
+
 sub init()
     m.video = m.top.findNode("video")
     if m.video.hasField("disableScreenSaver") then m.video.disableScreenSaver = true
@@ -12,6 +26,24 @@ sub init()
     m.ayuda = m.top.findNode("ayuda")
     m.codigoLbl = m.top.findNode("codigo")
     m.pendienteActivo = false
+
+    ' --- B1: capa de continuidad ---
+    m.capaEstado = m.top.findNode("capaEstado")
+    m.respaldo = m.top.findNode("respaldo")
+    m.detalle = m.top.findNode("detalle")
+    m.indicador = m.top.findNode("indicador")
+    m.fs = CreateObject("roFileSystem")
+    m.enRespaldo = false
+    m.esperaRespaldo = 10
+    m.fallosSeguidos = 0
+    m.fallosPorUrl = {}
+    m.bloqueadasHasta = {}
+    m.cacheInservibleVideo = 0
+    m.desconectadoDesde = ""
+    m.revisarComandoViejo = false
+    m.recibioPlaylist = false
+    m.urlsEnVideo = []
+    m.rutasEnVideo = []
 
     m.turnoGrp = m.top.findNode("turno")
     m.tPanel = m.top.findNode("tPanel")
@@ -56,13 +88,23 @@ sub init()
     m.estado.wrap = true
     ' De fábrica los textos se orientan para TV vertical (giro horario)
     orientarTextos(true, "horario")
+    ' B1: orientar la capa de continuidad con lo ultimo que se supo de la TV,
+    ' para que la lamina salga bien aunque arranque sin red.
+    configurarFoto(orientacionGuardada())
 
     ' Tarea que maneja registro (URL guardada) y consulta el servidor
     m.task = createObject("roSGNode", "PlaylistTask")
     m.task.observeField("playlistJson", "onPlaylistJson")
     m.task.observeField("serverUrl", "onServerUrlLoaded")
     m.task.observeField("errorMsg", "onTaskError")
+    m.task.observeField("conectado", "onConectado")
     m.task.control = "RUN"
+
+    ' B1: tarea de cache, aparte para que una descarga nunca retrase el latido
+    m.cacheTask = createObject("roSGNode", "CacheTask")
+    m.cacheTask.observeField("listo", "onCacheListo")
+    m.cacheTask.observeField("fallo", "onCacheFallo")
+    m.cacheTask.control = "RUN"
 
     m.video.observeField("state", "onVideoState")
 
@@ -76,6 +118,26 @@ sub init()
     m.timerReintento.duration = 5
     m.timerReintento.repeat = false
     m.timerReintento.observeField("fire", "onReintento")
+
+    ' B1: vigilante de buffering. Si en 25 s el video no arranca ni avanza,
+    ' se considera colgado y se pasa al siguiente.
+    m.timerBuffer = createObject("roSGNode", "Timer")
+    m.timerBuffer.duration = 25
+    m.timerBuffer.repeat = false
+    m.timerBuffer.observeField("fire", "onBufferColgado")
+
+    ' B1: reintentos desde la lamina de respaldo, con espera creciente
+    m.timerRespaldo = createObject("roSGNode", "Timer")
+    m.timerRespaldo.repeat = false
+    m.timerRespaldo.observeField("fire", "onReintentoRespaldo")
+
+    ' B1: si en 15 s no llego ninguna lista, mostrar la lamina en vez de
+    ' "Cargando configuración..." indefinido
+    m.timerArranqueRespaldo = createObject("roSGNode", "Timer")
+    m.timerArranqueRespaldo.duration = 15
+    m.timerArranqueRespaldo.repeat = false
+    m.timerArranqueRespaldo.observeField("fire", "onArranqueSinLista")
+    m.timerArranqueRespaldo.control = "start"
 
     m.estado.text = "Cargando configuración..."
     m.top.setFocus(true)
@@ -92,6 +154,14 @@ sub onTimeoutArranque()
     if (m.task.serverUrl = invalid or m.task.serverUrl = "") and m.top.dialog = invalid
         mostrarDialogoUrl("")
     end if
+end sub
+
+sub onArranqueSinLista()
+    if m.recibioPlaylist or m.pendienteActivo then return
+    if m.task.serverUrl = invalid or m.task.serverUrl = "" then return
+    ' Nunca se ha recibido una lista: puede ser red o una URL mal escrita.
+    ' La pista para cambiarla va pequena, en la lamina, no en grande.
+    mostrarRespaldo("sin respuesta del servidor  ·  presiona * para cambiar la URL")
 end sub
 
 ' ---------- Configuración de URL ----------
@@ -147,7 +217,10 @@ sub onPlaylistJson()
     datos = ParseJson(jsonStr)
     if datos = invalid then return
 
+    desdeCache = (m.task.desdeCache = true)
+
     if datos.pendiente <> invalid and datos.pendiente = true
+        if desdeCache then return
         modoPendiente(datos)
         return
     end if
@@ -160,16 +233,26 @@ sub onPlaylistJson()
     end if
 
     if datos.videos = invalid then return
+    m.recibioPlaylist = true
+    m.timerArranqueRespaldo.control = "stop"
 
     actualizarBarra(datos)
     configurarFoto(datos)
+    guardarOrientacion(datos)
 
     videosStr = FormatJson(datos.videos)
     if videosStr <> m.playlistActual
         m.playlistActual = videosStr
         reconstruirSegmentos(datos)
+        if not desdeCache then pedirCache(datos)
+    else if m.enRespaldo and m.segmentos.Count() > 0 and not desdeCache
+        ' misma lista, pero volvio el servidor: intentar salir de la lamina ya
+        salirDeRespaldoEIntentar()
     end if
 
+    ' Una lista servida desde la copia local no trae eventos nuevos:
+    ' sus comandos y turnos ya se atendieron (o vencieron) en su momento.
+    if desdeCache then return
     manejarComando(datos)
     manejarTurno(datos)
 end sub
@@ -201,11 +284,13 @@ sub reconstruirSegmentos(datos as object)
     if segVideo <> invalid then m.segmentos.Push(segVideo)
 
     m.timerFoto.control = "stop"
+    m.fallosSeguidos = 0
     if m.segmentos.Count() = 0
         m.video.control = "stop"
         m.video.visible = false
         ocultarFotos()
-        m.estado.text = "Sin contenido. Sube videos o fotos desde el panel web."
+        ' Sin contenido no es un fallo de red: lamina con aviso para quien atiende
+        mostrarRespaldo("sin contenido asignado")
         return
     end if
 
@@ -213,7 +298,7 @@ sub reconstruirSegmentos(datos as object)
     if hayFotoEnPantalla() or m.video.state = "playing" or m.video.state = "paused"
         ' ya hay algo en pantalla: no ensuciar con mensajes
         m.estado.text = ""
-    else
+    else if not m.enRespaldo
         ' arranque: mantener un mensaje hasta que aparezca el primer contenido
         m.estado.text = "Cargando contenido…"
     end if
@@ -229,20 +314,36 @@ sub reproducirSiguiente()
     m.indice = m.indice + 1
 
     if seg.tipo = "imagen"
-        mostrarFoto(seg.url, seg.duracion, false)
+        if estaBloqueada(seg.url)
+            saltarBloqueada()
+            return
+        end if
+        mostrarFoto(resolverUrl(seg.url), seg.duracion, false, false, seg.url)
     else
         m.timerFoto.control = "stop"
         ' la foto actual se queda visible hasta que el video empiece;
         ' si no hay foto, usar la miniatura del video como cortina
         if not hayFotoEnPantalla() and seg.mini <> invalid and seg.mini <> ""
-            mostrarFoto(seg.mini, 0, false, true)
+            mostrarFoto(resolverUrl(seg.mini), 0, false, true, seg.mini)
         end if
         raiz = createObject("roSGNode", "ContentNode")
+        m.urlsEnVideo = []
+        m.rutasEnVideo = []
         for each u in seg.urls
-            hijo = raiz.createChild("ContentNode")
-            hijo.url = u
-            hijo.streamFormat = "mp4"
+            if not estaBloqueada(u)
+                hijo = raiz.createChild("ContentNode")
+                ruta = resolverUrlVideo(u)
+                hijo.url = ruta
+                hijo.streamFormat = "mp4"
+                m.urlsEnVideo.Push(u)
+                m.rutasEnVideo.Push(ruta)
+            end if
         end for
+        if m.urlsEnVideo.Count() = 0
+            ' todo el bloque esta apartado por danado: saltarlo sin colgarse
+            saltarBloqueada()
+            return
+        end if
         m.video.visible = true
         m.video.control = "stop"
         m.video.contentIsPlaylist = true
@@ -250,6 +351,19 @@ sub reproducirSiguiente()
         ' si todo el contenido son videos, repetir sin cortes
         m.video.loop = (m.segmentos.Count() = 1)
         m.video.control = "play"
+        m.timerBuffer.control = "start"
+    end if
+end sub
+
+sub saltarBloqueada()
+    ' Cuenta como fallo para que, si TODO esta apartado, se llegue a la lamina
+    ' en vez de dar vueltas sin fin.
+    m.fallosSeguidos = m.fallosSeguidos + 1
+    if m.fallosSeguidos >= m.segmentos.Count()
+        mostrarRespaldo()
+        programarReintento()
+    else
+        reproducirSiguiente()
     end if
 end sub
 
@@ -257,8 +371,8 @@ function hayFotoEnPantalla() as boolean
     return m.fotoVisible.visible
 end function
 
-sub mostrarFoto(url as string, dur as integer, fija as boolean, cortina = false as boolean)
-    m.fotoPendiente = {dur: dur, fija: fija, cortina: cortina}
+sub mostrarFoto(url as string, dur as integer, fija as boolean, cortina = false as boolean, urlOriginal = "" as string)
+    m.fotoPendiente = {dur: dur, fija: fija, cortina: cortina, origen: urlOriginal, uri: url}
     if m.fotoBuffer.uri = url and m.fotoBuffer.loadStatus = "ready"
         intercambiarFotos()
     else
@@ -272,8 +386,19 @@ sub onFotoCargada()
     if estado = "ready"
         intercambiarFotos()
     else if estado = "failed"
+        p = m.fotoPendiente
         m.fotoPendiente = invalid
-        reproducirSiguiente()
+        if p.cortina = true
+            ' una miniatura que no carga no es un fallo de contenido
+            return
+        end if
+        if p.uri <> invalid and Left(p.uri, 8) = "cachefs:"
+            ' la copia local esta mal: borrarla y reintentar por red la proxima
+            m.fs.Delete(p.uri)
+        else if p.origen <> invalid and p.origen <> ""
+            registrarFalloUrl(p.origen)
+        end if
+        registrarFallo()
     end if
 end sub
 
@@ -288,6 +413,7 @@ sub intercambiarFotos()
     else
         m.video.control = "stop"
         m.video.visible = false
+        m.timerBuffer.control = "stop"
     end if
     m.fotoBuffer.visible = true
     m.fotoVisible.visible = false
@@ -300,13 +426,17 @@ sub intercambiarFotos()
     if p.cortina = true
         ' se quita sola cuando el video empieza (onVideoState "playing")
         m.timerFoto.control = "stop"
-    else if p.fija
-        m.fotoRapida = true
-        m.timerFoto.control = "stop"
     else
-        m.fotoRapida = false
-        m.timerFoto.duration = p.dur
-        m.timerFoto.control = "start"
+        ' una foto en pantalla es contenido reproducido: salir de la lamina
+        contenidoEnPantalla()
+        if p.fija
+            m.fotoRapida = true
+            m.timerFoto.control = "stop"
+        else
+            m.fotoRapida = false
+            m.timerFoto.duration = p.dur
+            m.timerFoto.control = "start"
+        end if
     end if
 end sub
 
@@ -321,6 +451,174 @@ sub onFotoTimer()
     reproducirSiguiente()
 end sub
 
+' ---------- B1: cache local ----------
+
+sub pedirCache(datos as object)
+    lista = []
+    for each v in datos.videos
+        if v.url <> invalid and v.url <> ""
+            lista.Push({url: v.url})
+        end if
+        if v.mini <> invalid and v.mini <> ""
+            lista.Push({url: v.mini})
+        end if
+    end for
+    m.cacheTask.deseados = {lista: lista}
+end sub
+
+sub onCacheListo()
+    ' Nada que hacer en caliente: resolverUrl consulta el disco al reproducir.
+end sub
+
+sub onCacheFallo()
+    ' Informativo. Una descarga fallida no afecta la reproduccion por red.
+end sub
+
+' Fotos y miniaturas: cachefs esta recomendado por Roku para imagenes.
+function resolverUrl(url as string) as string
+    ruta = rutaDeCache(url)
+    if m.fs.Exists(ruta) then return ruta
+    return url
+end function
+
+' Videos: usar la copia local salvo que este modelo demuestre no soportarlo.
+function resolverUrlVideo(url as string) as string
+    if m.cacheInservibleVideo >= 2 then return url
+    return resolverUrl(url)
+end function
+
+' ---------- B1: fallos, histeresis y lamina de respaldo ----------
+
+function estaBloqueada(url as string) as boolean
+    hasta = m.bloqueadasHasta[url]
+    if hasta = invalid then return false
+    if ahoraSegundos() >= hasta
+        m.bloqueadasHasta.Delete(url)
+        m.fallosPorUrl.Delete(url)
+        return false
+    end if
+    return true
+end function
+
+sub registrarFalloUrl(url as string)
+    ' Sin red, todo falla: eso no dice nada del archivo. No se le cuenta.
+    if m.task.conectado = false then return
+    n = m.fallosPorUrl[url]
+    if n = invalid then n = 0
+    n = n + 1
+    m.fallosPorUrl[url] = n
+    ' Tres fallos seguidos del mismo archivo: apartarlo 10 minutos. Asi un
+    ' archivo danado no detiene el resto de la lista, y si era la red la que
+    ' fallaba, vuelve a intentarse solo.
+    if n >= 3 then m.bloqueadasHasta[url] = ahoraSegundos() + 600
+end sub
+
+sub registrarFallo()
+    m.fallosSeguidos = m.fallosSeguidos + 1
+    total = m.segmentos.Count()
+    if total < 1 then total = 1
+    if m.fallosSeguidos >= total and not m.enRespaldo
+        ' una vuelta completa sin nada reproducible
+        mostrarRespaldo()
+    end if
+    programarReintento()
+end sub
+
+sub programarReintento()
+    if m.enRespaldo
+        m.timerRespaldo.duration = m.esperaRespaldo
+        m.timerRespaldo.control = "start"
+        if m.esperaRespaldo < 60
+            m.esperaRespaldo = m.esperaRespaldo * 2
+            if m.esperaRespaldo > 60 then m.esperaRespaldo = 60
+        end if
+    else
+        m.timerReintento.control = "start"
+    end if
+end sub
+
+sub onReintentoRespaldo()
+    if not m.enRespaldo then return
+    if m.segmentos.Count() = 0 then return
+    reproducirSiguiente()
+end sub
+
+sub salirDeRespaldoEIntentar()
+    m.esperaRespaldo = 10
+    m.fallosSeguidos = 0
+    m.timerRespaldo.control = "stop"
+    reproducirSiguiente()
+end sub
+
+' Algo (video o foto) esta de verdad en pantalla
+sub contenidoEnPantalla()
+    m.fallosSeguidos = 0
+    m.esperaRespaldo = 10
+    if m.enRespaldo then ocultarRespaldo()
+end sub
+
+sub mostrarRespaldo(motivo = "" as string)
+    m.timerFoto.control = "stop"
+    m.timerBuffer.control = "stop"
+    m.video.control = "stop"
+    m.video.visible = false
+    ocultarFotos()
+    m.estado.text = ""
+    m.ayuda.text = ""
+    m.enRespaldo = true
+    m.respaldo.visible = true
+    actualizarDetalle(motivo)
+end sub
+
+sub ocultarRespaldo()
+    m.enRespaldo = false
+    m.esperaRespaldo = 10
+    m.timerRespaldo.control = "stop"
+    m.respaldo.visible = false
+    m.detalle.visible = false
+end sub
+
+' Texto pequeno para quien atiende, SOLO sobre la lamina, nunca sobre el contenido
+sub actualizarDetalle(motivo = "" as string)
+    if not m.enRespaldo then return
+    texto = ""
+    if m.task.conectado = false
+        texto = "sin conexión"
+        if m.desconectadoDesde <> "" then texto = texto + " desde " + m.desconectadoDesde
+    else if motivo <> ""
+        texto = motivo
+    else
+        texto = "contenido no disponible"
+    end if
+    if m.task.ultimaSincronizacion <> invalid and m.task.ultimaSincronizacion <> ""
+        texto = texto + "  ·  última sincronización " + m.task.ultimaSincronizacion
+    end if
+    m.detalle.text = texto
+    m.detalle.visible = true
+end sub
+
+' ---------- B1: estado de red ----------
+
+sub onConectado()
+    if m.task.conectado = false
+        m.desconectadoDesde = horaLocal()
+        m.indicador.visible = true
+        ' cualquier comando que llegue tras reconectar se revisara antes de ejecutarlo
+        m.revisarComandoViejo = true
+        actualizarDetalle()
+    else
+        m.indicador.visible = false
+        ' lo que fallo sin red no era culpa del archivo: limpiar apartados
+        m.bloqueadasHasta = {}
+        m.fallosPorUrl = {}
+        if m.enRespaldo and m.segmentos.Count() > 0
+            salirDeRespaldoEIntentar()
+        else
+            actualizarDetalle()
+        end if
+    end if
+end sub
+
 ' ---------- Comandos en vivo desde el panel ----------
 
 sub manejarComando(datos as object)
@@ -332,6 +630,18 @@ sub manejarComando(datos as object)
         return
     end if
     if c.n = m.ultimoComando then return
+
+    if m.revisarComandoViejo
+        ' Primer comando NUEVO tras una desconexion: se emitio mientras la TV
+        ' no escuchaba. Un "reproducir ahora" atrasado sorprenderia a la
+        ' clienta; se descarta. Pausa/silencio describen un estado deseado y
+        ' si se aplican.
+        m.revisarComandoViejo = false
+        if c.accion = "reproducir"
+            m.ultimoComando = c.n
+            return
+        end if
+    end if
     m.ultimoComando = c.n
 
     if c.accion = "pausa"
@@ -339,6 +649,7 @@ sub manejarComando(datos as object)
             m.video.control = "pause"
         end if
         m.timerFoto.control = "stop"
+        m.timerBuffer.control = "stop"
     else if c.accion = "continuar"
         if m.fotoRapida = true
             m.fotoRapida = false
@@ -358,36 +669,83 @@ sub manejarComando(datos as object)
         if c.tipo = "imagen"
             dur = 10
             if c.duracion <> invalid then dur = c.duracion
-            mostrarFoto(c.url, dur, dur <= 0)
+            mostrarFoto(resolverUrl(c.url), dur, dur <= 0, false, c.url)
         else
             m.timerFoto.control = "stop"
             raiz = createObject("roSGNode", "ContentNode")
             hijo = raiz.createChild("ContentNode")
-            hijo.url = c.url
+            hijo.url = resolverUrlVideo(c.url)
             hijo.streamFormat = "mp4"
+            m.urlsEnVideo = [c.url]
+            m.rutasEnVideo = [hijo.url]
             m.video.visible = true
             m.video.control = "stop"
             m.video.contentIsPlaylist = true
             m.video.content = raiz
             m.video.loop = false
             m.video.control = "play"
+            m.timerBuffer.control = "start"
         end if
         ' al terminar, onVideoState/onFotoTimer continúan el bucle normal
     end if
 end sub
 
+' ---------- Reproduccion de video ----------
+
 sub onVideoState()
     estado = m.video.state
-    if estado = "playing"
+    if estado = "buffering"
+        ' arranca el vigilante; si ya estaba corriendo, sigue
+        if m.timerBuffer.control <> "start" then m.timerBuffer.control = "start"
+    else if estado = "playing"
+        m.timerBuffer.control = "stop"
         ocultarFotos()
         m.estado.text = ""
         m.ayuda.text = ""
+        contenidoEnPantalla()
     else if estado = "finished"
+        m.timerBuffer.control = "stop"
         reproducirSiguiente()
     else if estado = "error"
-        m.estado.text = "Error al reproducir. Saltando..."
-        m.timerReintento.control = "start"
+        m.timerBuffer.control = "stop"
+        atenderFalloDeVideo("error")
+    else if estado = "paused"
+        m.timerBuffer.control = "stop"
     end if
+    ' "stopped" no apaga el vigilante a proposito: ese estado lo provocamos
+    ' nosotros justo antes de "play" y su evento llega en cola despues de que
+    ' el vigilante ya arranco. Si lo apagara, un video que nunca emite
+    ' "buffering" podria quedarse colgado sin nadie que lo vigile.
+end sub
+
+sub onBufferColgado()
+    if m.video.state = "buffering"
+        ' 25 s sin arrancar ni avanzar: esto es "se queda cargando"
+        m.video.control = "stop"
+        atenderFalloDeVideo("buffering")
+    end if
+end sub
+
+sub atenderFalloDeVideo(causa as string)
+    ' Que archivo fallo: el que estaba sonando dentro del bloque encadenado
+    i = m.video.contentIndex
+    if i = invalid or i < 0 or i >= m.urlsEnVideo.Count() then i = 0
+    if m.urlsEnVideo.Count() > 0
+        url = m.urlsEnVideo[i]
+        ruta = m.rutasEnVideo[i]
+        if Left(ruta, 8) = "cachefs:"
+            ' La copia local no se pudo reproducir. Puede ser el archivo o que
+            ' este modelo no reproduzca desde cachefs: borrarla y, si se
+            ' repite, dejar de usar cache para video en esta sesion.
+            m.fs.Delete(ruta)
+            m.cacheInservibleVideo = m.cacheInservibleVideo + 1
+            ' no cuenta contra la URL: se volvera a intentar por red
+        else
+            registrarFalloUrl(url)
+        end if
+    end if
+    ' Sin texto tecnico para la clienta: se salta en silencio
+    registrarFallo()
 end sub
 
 sub onReintento()
@@ -396,8 +754,11 @@ sub onReintento()
 end sub
 
 sub onTaskError()
+    ' Solo mientras la pantalla no ha recibido nunca una lista (configuracion
+    ' inicial). En operacion, la falta de red se muestra con la lamina.
+    if m.recibioPlaylist then return
     if m.video.state <> "playing" and m.video.state <> "buffering" and not hayFotoEnPantalla()
-        m.estado.text = m.task.errorMsg
+        if not m.enRespaldo then m.estado.text = m.task.errorMsg
     end if
 end sub
 
@@ -414,8 +775,19 @@ sub manejarTurno(datos as object)
     if t.n = m.ultimoTurno then return
     m.ultimoTurno = t.n
     if t.numero = invalid or t.numero = "" then return
+    if turnoVencido(t) then return
     mostrarTurnoPanel(datos, t)
 end sub
+
+' Un turno cuya ventana de anuncio ya paso no se muestra: llamaria a alguien
+' que ya no esta esperando. Tolerancia de 30 s por desfase de relojes.
+function turnoVencido(t as object) as boolean
+    if t.ts = invalid then return false
+    dur = 60
+    if t.duracion <> invalid then dur = t.duracion
+    edad = ahoraSegundos() - t.ts
+    return edad > (dur + 30)
+end function
 
 sub mostrarTurnoPanel(datos as object, t as object)
     espera = ""
@@ -467,6 +839,12 @@ sub mostrarTurnoPanel(datos as object, t as object)
 
     dur = 60
     if t.duracion <> invalid then dur = t.duracion
+    ' si el turno lleva tiempo emitido, solo se muestra lo que le queda
+    if t.ts <> invalid
+        restante = dur - (ahoraSegundos() - t.ts)
+        if restante < 5 then restante = 5
+        if restante < dur then dur = restante
+    end if
     m.timerTurno.duration = dur
     m.timerTurno.control = "start"
 end sub
@@ -592,6 +970,8 @@ sub modoPendiente(datos as object)
     m.video.control = "stop"
     m.video.visible = false
     ocultarFotos()
+    if m.enRespaldo then ocultarRespaldo()
+    m.timerArranqueRespaldo.control = "stop"
     m.top.findNode("barra").visible = false
     m.barraClave = ""
     m.timerFoto.control = "stop"
@@ -654,7 +1034,7 @@ sub orientarTextos(vertical as boolean, giro as string)
     end if
 end sub
 
-' ---------- Fotos: orientación según la TV ----------
+' ---------- Fotos y capa de continuidad: orientación según la TV ----------
 
 sub configurarFoto(datos as object)
     vertical = (datos.vertical = true)
@@ -665,10 +1045,12 @@ sub configurarFoto(datos as object)
     if clave = m.fotoClave then return
     m.fotoClave = clave
 
-    for each p in [m.foto, m.fotoB]
+    for each p in [m.foto, m.fotoB, m.capaEstado]
         if vertical
-            p.width = m.alto
-            p.height = m.ancho
+            if p.hasField("width")
+                p.width = m.alto
+                p.height = m.ancho
+            end if
             if giro = "horario"
                 p.rotation = 1.5708
                 p.translation = [0, m.alto]
@@ -677,12 +1059,67 @@ sub configurarFoto(datos as object)
                 p.translation = [m.ancho, 0]
             end if
         else
-            p.width = m.ancho
-            p.height = m.alto
+            if p.hasField("width")
+                p.width = m.ancho
+                p.height = m.alto
+            end if
             p.rotation = 0
             p.translation = [0, 0]
         end if
     end for
+
+    ' hijos de la capa, en coordenadas de la pantalla fisica
+    if vertical
+        lw = m.alto
+        lh = m.ancho
+        m.respaldo.uri = "pkg:/images/respaldo_vertical.png"
+    else
+        lw = m.ancho
+        lh = m.alto
+        m.respaldo.uri = "pkg:/images/respaldo_horizontal.png"
+    end if
+    m.respaldo.width = lw
+    m.respaldo.height = lh
+    m.respaldo.translation = [0, 0]
+
+    margen = int(0.03 * lw)
+    punto = 24
+    m.indicador.width = punto
+    m.indicador.height = punto
+    m.indicador.translation = [lw - margen - punto, lh - margen - punto]
+
+    m.detalle.width = lw - (2 * margen) - punto - 20
+    m.detalle.height = 40
+    m.detalle.translation = [margen, lh - margen - 32]
+end sub
+
+' ---------- Orientacion recordada entre arranques (registro, ~20 bytes) ----------
+
+function orientacionGuardada() as object
+    reg = CreateObject("roRegistrySection", "config")
+    vertical = true
+    giro = "horario"
+    if reg.Exists("vertical") then vertical = (reg.Read("vertical") = "1")
+    if reg.Exists("giro") and reg.Read("giro") <> "" then giro = reg.Read("giro")
+    return {vertical: vertical, giro: giro}
+end function
+
+sub guardarOrientacion(datos as object)
+    v = "1"
+    if datos.vertical <> true then v = "0"
+    g = "horario"
+    if datos.giro <> invalid then g = datos.giro
+    reg = CreateObject("roRegistrySection", "config")
+    cambio = false
+    if not reg.Exists("vertical") or reg.Read("vertical") <> v
+        reg.Write("vertical", v)
+        cambio = true
+    end if
+    if not reg.Exists("giro") or reg.Read("giro") <> g
+        reg.Write("giro", g)
+        cambio = true
+    end if
+    if cambio then reg.Flush()
 end sub
 
 ' ---------- Barra de mensajes ----------
@@ -767,6 +1204,23 @@ sub actualizarBarra(datos as object)
 
     barra.visible = true
 end sub
+
+' ---------- Utilidades de tiempo ----------
+
+function ahoraSegundos() as integer
+    dt = CreateObject("roDateTime")
+    return dt.AsSeconds()
+end function
+
+function horaLocal() as string
+    dt = CreateObject("roDateTime")
+    dt.ToLocalTime()
+    h = dt.GetHours().toStr()
+    mi = dt.GetMinutes().toStr()
+    if h.Len() < 2 then h = "0" + h
+    if mi.Len() < 2 then mi = "0" + mi
+    return h + ":" + mi
+end function
 
 ' ---------- Control remoto ----------
 
