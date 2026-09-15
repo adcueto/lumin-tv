@@ -101,9 +101,16 @@ def ip_local():
 
 
 def nombre_seguro(nombre):
-    nombre = os.path.basename(nombre)
-    nombre = re.sub(r"[^A-Za-z0-9 ._\-()]", "_", nombre)
-    return nombre.strip() or "archivo.mp4"
+    """Limpia el nombre sin perder acentos ni eñes (español)."""
+    nombre = os.path.basename(str(nombre))
+    nombre = nombre.replace("/", "_").replace("\\", "_")
+    # se permiten letras y numeros de cualquier idioma, espacios y . _ - ( )
+    nombre = "".join(
+        c if (c.isalnum() or c in " ._-()") else "_"
+        for c in nombre
+    )
+    nombre = re.sub(r"\s{2,}", " ", nombre)
+    return nombre.strip(" .") or "archivo.mp4"
 
 
 def clave_segura(clave):
@@ -1269,6 +1276,55 @@ class Manejador(BaseHTTPRequestHandler):
                 escribir_json(ARCHIVO_LISTAS, todas)
             self._responder(200, '{"ok":true}')
 
+        elif ruta.path == "/api/renombrar":
+            datos = self._json_body()
+            clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
+            viejo_n = nombre_seguro(datos.get("nombre", ""))
+            propuesto = str(datos.get("nuevo", "")).strip()
+            # conservar la extension original
+            ext = os.path.splitext(viejo_n)[1]
+            base = nombre_seguro(os.path.splitext(propuesto)[0])[:80].strip()
+            if not base or not viejo_n:
+                self._responder(400, '{"error":"nombre invalido"}')
+                return
+            nuevo_n = base + ext
+            with CANDADO:
+                origen = os.path.join(dir_videos(clave), viejo_n)
+                destino = os.path.join(dir_videos(clave), nuevo_n)
+                if not os.path.isfile(origen):
+                    self._responder(404, '{"error":"no existe"}')
+                    return
+                if nuevo_n != viejo_n and os.path.exists(destino):
+                    self._responder(409, '{"error":"ya existe otro con ese nombre"}')
+                    return
+                if nuevo_n != viejo_n:
+                    os.rename(origen, destino)
+                    mo = os.path.join(dir_minis(clave), viejo_n + ".jpg")
+                    if os.path.isfile(mo):
+                        os.replace(mo, os.path.join(dir_minis(clave), nuevo_n + ".jpg"))
+                    # actualizar todas las referencias al nombre
+                    ordenes = leer_json(ARCHIVO_ORDENES, {})
+                    ordenes[clave] = [nuevo_n if n == viejo_n else n
+                                      for n in ordenes.get(clave, [])]
+                    escribir_json(ARCHIVO_ORDENES, ordenes)
+
+                    todas = leer_json(ARCHIVO_LISTAS, {})
+                    suc = todas.get(clave)
+                    if suc:
+                        for l in suc.get("listas", {}).values():
+                            l["archivos"] = [nuevo_n if n == viejo_n else n
+                                             for n in l.get("archivos", [])]
+                        todas[clave] = suc
+                        escribir_json(ARCHIVO_LISTAS, todas)
+
+                    for archivo in (ARCHIVO_DURACIONES, ARCHIVO_GIRADOS,
+                                    ARCHIVO_PROGRAMACION, ARCHIVO_CONTADORES):
+                        d = leer_json(archivo, {})
+                        if clave in d and viejo_n in d[clave]:
+                            d[clave][nuevo_n] = d[clave].pop(viejo_n)
+                            escribir_json(archivo, d)
+            self._responder(200, json.dumps({"ok": True, "nombre": nuevo_n}))
+
         elif ruta.path == "/api/mover":
             datos = self._json_body()
             clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
@@ -1779,8 +1835,8 @@ PANEL_HTML = """<!DOCTYPE html>
     <h2>Biblioteca <span id="bibCuantos" style="color:var(--gris); font-weight:400"></span></h2>
     <ul id="biblioteca"></ul>
     <p class="nota">Todo el contenido guardado en la nube de esta sucursal. «Agregar»
-    lo suma a la lista que estás editando; «Eliminar de la nube» sí lo borra para
-    siempre de todas las listas.</p>
+    lo suma a la lista que estás editando; «Renombrar» le cambia el nombre en todas
+    las listas sin perder nada; «Eliminar de la nube» sí lo borra para siempre.</p>
   </section>
 
 </main>
@@ -2217,9 +2273,28 @@ async function cargar() {
       </div>
       <div class="acciones">
         <button class="btn btn-mini ${ya ? "" : "btn-primario"}" ${ya ? "disabled" : ""}>${ya ? "Ya en la lista" : "Agregar"}</button>
+        <button class="btn btn-mini btn-renombrar">Renombrar</button>
         <button class="btn btn-mini btn-peligro">Eliminar de la nube</button>
       </div>`;
-    const [agregar, borrar] = li.querySelectorAll("button");
+    const [agregar, renombrar, borrar] = li.querySelectorAll("button");
+    renombrar.onclick = async () => {
+      const sinExt = a.nombre.replace(/[.][^.]+$/, "");
+      const nuevo = prompt("Nuevo nombre (sin extensión):", sinExt);
+      if (nuevo === null) return;
+      const limpio = nuevo.trim();
+      if (!limpio || limpio === sinExt) return;
+      const r = await fetch("/api/renombrar", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sucursal, nombre: a.nombre, nuevo: limpio }) });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        alert(e.error === "ya existe otro con ese nombre"
+          ? "Ya hay otro contenido con ese nombre en esta sucursal."
+          : "No se pudo renombrar.");
+        return;
+      }
+      avisoGuardado(); cargar();
+    };
     agregar.onclick = () => cambiarEnLista({ agregar: [a.nombre] });
     borrar.onclick = () => {
       if (!confirm(`¿Eliminar "${a.nombre}" de la nube?\nSe quitará de TODAS las listas y no se podrá recuperar.`)) return;
