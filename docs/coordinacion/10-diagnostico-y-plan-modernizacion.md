@@ -362,3 +362,80 @@ correos reales. No se declara compatibilidad de dispositivos sin equipo físico
 probado. Fuera de alcance y sin empezar: registro público, planes,
 suscripciones, cobros, facturación, panel del propietario, página comercial,
 otros reproductores y funciones de IA.
+
+---
+
+## 8. Addendum — hallazgos del encargo ampliado
+
+### 8.1 Causa de los dos equipos con número 6 (y "P6" en los selectores)
+
+**Reproducido y confirmado. Es un defecto, no una coincidencia.**
+
+`registrar_tv` asigna el número con `indice = len(tvs)` (`servidor_lumin.py:443`),
+es decir, la cantidad de pantallas que hay *en ese momento*. Y
+`/api/tv/eliminar` (`:1402`) borra la entrada con `tvs.pop(id_tv)`.
+
+En cuanto se da de baja una pantalla **intermedia**, el conteo deja de coincidir
+con el número más alto en uso, y la siguiente pantalla que se registre recibe un
+número que ya existe:
+
+```
+seis pantallas dadas de alta   ->  1, 2, 3, 4, 5, 6
+se elimina la tercera          ->  1, 2, 4, 5, 6
+entra una TV nueva             ->  1, 2, 4, 5, 6, 6     <-- duplicado
+```
+
+El panel etiqueta las pantallas como `P` + número, así que las dos aparecen como
+**P6**, exactamente como observó Codex.
+
+**Efecto secundario, menos visible pero peor:** `indice` no es solo una etiqueta.
+`playlist.json` lo usa para escalonar el arranque de la lista
+(`giro_lista = indice % len(archivos)`, `:745`). Dos pantallas con el mismo
+índice arrancan la lista **en la misma posición**, de modo que reproducen lo
+mismo al mismo tiempo en vez de alternarse. Si en una sucursal hay dos pantallas
+mostrando siempre el mismo anuncio a la vez, ésta es la razón.
+
+**Corrección propuesta (bloque B5):** separar los dos conceptos que hoy están
+mezclados en un solo campo.
+
+- Un **identificador visible** estable y único, que no se reutiliza al dar de
+  baja una pantalla y no cambia cuando se reordena la flota.
+- Un **desfase de rotación** calculado aparte, que sí puede recalcularse.
+
+El identificador técnico que usa Roku (`GetChannelClientId`) **no se toca**: es
+la llave con la que la TV se reconoce ante el servidor y cambiarla obligaría a
+volver a vincular toda la flota.
+
+Nota: la rama `fase1-sqlite-respaldos` reescribió `registrar_tv` usando
+`COUNT(*)`, que **conserva el mismo defecto**. Si se rescata algo de esa rama,
+esta parte no.
+
+### 8.2 "Lista al aire" no distingue herencia de asignación
+
+`lista_de_tv` (`:326-330`) devuelve la lista asignada a la pantalla y, si no
+tiene, la activa de la sucursal. El panel muestra el resultado sin decir cuál de
+los dos casos es. Desde el panel no se puede saber si cambiar la lista activa de
+la sucursal afectará a esa pantalla o no. La etiqueta debe decir
+**"Heredada de la sucursal: Principal"** o **"Asignada a esta TV: Navidad"**.
+
+### 8.3 Escenarios de red: de cuatro a seis
+
+El encargo ampliado añade dos casos que hay que probar y documentar aparte:
+**archivo no disponible o incompatible** y **conexión intermitente**. El segundo
+es el que más daño hace en la práctica, porque una red que va y viene puede
+dejar al reproductor entrando y saliendo de `buffering` sin estabilizarse nunca.
+Entra en B1 con histéresis: no reintentar de inmediato, ni dar por recuperada la
+conexión con una sola respuesta buena.
+
+### 8.4 Estadísticas: cinco eventos distintos, no uno
+
+Hoy existe un solo contador que se incrementa al pedir el archivo, incluso
+cuando la respuesta es 404 (QA-F04). El encargo pide distinguir solicitud,
+descarga, inicio de reproducción, finalización y error. Sólo el reproductor
+puede reportar los tres últimos, así que **esto depende de B8**: hasta que la TV
+mande eventos propios, el servidor no puede saber si un video se reprodujo. Lo
+que sí se puede hacer antes es dejar de contar 404 y deduplicar por `Range`.
+
+**Semántica que quedará documentada:** una reproducción no es una persona, y no
+es una venta. Los reportes a anunciantes deben decir "reproducciones
+registradas", nunca "vistas".
