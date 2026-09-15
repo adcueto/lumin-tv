@@ -50,6 +50,7 @@ DIR_MINIATURAS = os.path.join(BASE, "miniaturas")
 DIR_RAPIDOS = os.path.join(BASE, "rapidos")
 ARCHIVO_SUCURSALES = os.path.join(BASE, "sucursales.json")
 ARCHIVO_ORDENES = os.path.join(BASE, "ordenes.json")
+ARCHIVO_LISTAS = os.path.join(BASE, "listas.json")
 ARCHIVO_AJUSTES = os.path.join(BASE, "ajustes.json")
 ARCHIVO_DURACIONES = os.path.join(BASE, "duraciones.json")
 ARCHIVO_TVS = os.path.join(BASE, "tvs.json")
@@ -261,6 +262,67 @@ def lista_archivos(clave):
         return orden
 
 
+def biblioteca(clave):
+    """Todos los archivos que existen en la nube para esa sucursal."""
+    return lista_archivos(clave)
+
+
+def _listas_crudas(clave):
+    """Estructura de listas de la sucursal, creando la Principal la 1a vez."""
+    todas = leer_json(ARCHIVO_LISTAS, {})
+    suc = todas.get(clave)
+    if not suc or not suc.get("listas"):
+        suc = {"activa": "principal",
+               "listas": {"principal": {"nombre": "Principal",
+                                        "archivos": lista_archivos(clave)}}}
+        todas[clave] = suc
+        escribir_json(ARCHIVO_LISTAS, todas)
+    return todas, suc
+
+
+def listas_de(clave):
+    with CANDADO:
+        _, suc = _listas_crudas(clave)
+        en_disco = set(lista_archivos(clave))
+        salida = []
+        for lid, l in suc["listas"].items():
+            vigentes = [n for n in l.get("archivos", []) if n in en_disco]
+            salida.append({"id": lid, "nombre": l.get("nombre", lid),
+                           "cuantos": len(vigentes)})
+        salida.sort(key=lambda x: x["nombre"].lower())
+        return {"activa": suc.get("activa", "principal"), "listas": salida}
+
+
+def archivos_de_lista(clave, lid=""):
+    """Archivos de una lista (o de la activa), solo los que siguen en la nube."""
+    with CANDADO:
+        _, suc = _listas_crudas(clave)
+        if lid not in suc["listas"]:
+            lid = suc.get("activa", "principal")
+        if lid not in suc["listas"]:
+            lid = next(iter(suc["listas"]))
+        en_disco = set(lista_archivos(clave))
+        return [n for n in suc["listas"][lid].get("archivos", []) if n in en_disco]
+
+
+def guardar_lista(clave, lid, archivos):
+    with CANDADO:
+        todas, suc = _listas_crudas(clave)
+        if lid in suc["listas"]:
+            suc["listas"][lid]["archivos"] = archivos
+            todas[clave] = suc
+            escribir_json(ARCHIVO_LISTAS, todas)
+
+
+def lista_de_tv(clave, id_tv):
+    """Lista asignada a esa pantalla; si no tiene, la activa de la sucursal."""
+    asignada = leer_json(ARCHIVO_TVS, {}).get(id_tv, {}).get("lista", "")
+    _, suc = _listas_crudas(clave)
+    if asignada and asignada in suc["listas"]:
+        return asignada
+    return suc.get("activa", "principal")
+
+
 def leer_ajustes(clave):
     todos = leer_json(ARCHIVO_AJUSTES, {})
     a = todos.get(clave, {})
@@ -402,6 +464,7 @@ def pantallas(clave=None):
             "en_linea": (ahora - info.get("visto", 0)) < 30,
             "visto_hace": ahora - info.get("visto", 0),
             "turnos": info.get("turnos", False),
+            "lista": info.get("lista", ""),
             "pausada": info.get("pausada", False),
             "silencio": info.get("silencio", False),
         })
@@ -668,7 +731,9 @@ class Manejador(BaseHTTPRequestHandler):
 
             host = self.headers.get("Host", f"{ip_local()}:{PUERTO}")
             esquema = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
-            archivos = [n for n in lista_archivos(clave) if contenido_activo(clave, n)]
+            lid = lista_de_tv(clave, id_tv)
+            archivos = [n for n in archivos_de_lista(clave, lid)
+                        if contenido_activo(clave, n)]
             if archivos:
                 giro_lista = indice % len(archivos)
                 archivos = archivos[giro_lista:] + archivos[:giro_lista]
@@ -777,10 +842,34 @@ class Manejador(BaseHTTPRequestHandler):
         elif ruta.path == "/api/sucursales":
             self._responder(200, json.dumps(sucursales_permitidas(u), ensure_ascii=False))
 
+        elif ruta.path == "/api/listas":
+            clave = self._sucursal_de(params, u)
+            self._responder(200, json.dumps(listas_de(clave), ensure_ascii=False))
+
+        elif ruta.path == "/api/biblioteca":
+            clave = self._sucursal_de(params, u)
+            _, suc = _listas_crudas(clave)
+            resultado = []
+            for n in biblioteca(clave):
+                generar_miniatura(clave, n)
+                ext = os.path.splitext(n)[1].lower()
+                tiene = os.path.exists(os.path.join(dir_minis(clave), n + ".jpg"))
+                donde = sorted(l.get("nombre", lid) for lid, l in suc["listas"].items()
+                               if n in l.get("archivos", []))
+                resultado.append({
+                    "nombre": n,
+                    "tipo": "imagen" if ext in EXT_IMAGEN else "video",
+                    "duracion": duracion_de(clave, n),
+                    "miniatura": f"/miniaturas/{clave}/" + urllib.parse.quote(n) + ".jpg" if tiene else "",
+                    "listas": donde,
+                })
+            self._responder(200, json.dumps(resultado, ensure_ascii=False))
+
         elif ruta.path == "/api/lista":
             clave = self._sucursal_de(params, u)
+            lid = params.get("lista", [""])[0]
             resultado = []
-            for n in lista_archivos(clave):
+            for n in archivos_de_lista(clave, lid):
                 generar_miniatura(clave, n)
                 ext = os.path.splitext(n)[1].lower()
                 tiene = os.path.exists(os.path.join(dir_minis(clave), n + ".jpg"))
@@ -945,12 +1034,21 @@ class Manejador(BaseHTTPRequestHandler):
             mensaje = procesar_subida(camino)
             lista_archivos(clave)
             base_nombre = os.path.splitext(nombre)[0]
+            final = ""
             for candidato in (nombre, base_nombre + ".mp4"):
                 if os.path.isfile(os.path.join(dir_videos(clave), candidato)):
                     if mensaje == "girado":
                         marcar_girado(clave, candidato)
                     generar_miniatura(clave, candidato)
+                    final = candidato
                     break
+            if final:
+                lid = params.get("lista", [""])[0][:40]
+                if not lid:
+                    lid = listas_de(clave)["activa"]
+                actuales = archivos_de_lista(clave, lid)
+                if final not in actuales:
+                    guardar_lista(clave, lid, actuales + [final])
             self._responder(200, json.dumps({"ok": True, "proceso": mensaje}))
 
 
@@ -1076,9 +1174,99 @@ class Manejador(BaseHTTPRequestHandler):
             mini = os.path.join(dir_minis(clave), nombre + ".jpg")
             if os.path.isfile(mini):
                 os.remove(mini)
-            ordenes = leer_json(ARCHIVO_ORDENES, {})
-            ordenes[clave] = [n for n in ordenes.get(clave, []) if n != nombre]
-            escribir_json(ARCHIVO_ORDENES, ordenes)
+            with CANDADO:
+                ordenes = leer_json(ARCHIVO_ORDENES, {})
+                ordenes[clave] = [n for n in ordenes.get(clave, []) if n != nombre]
+                escribir_json(ARCHIVO_ORDENES, ordenes)
+                todas = leer_json(ARCHIVO_LISTAS, {})
+                suc = todas.get(clave)
+                if suc:
+                    for l in suc.get("listas", {}).values():
+                        l["archivos"] = [n for n in l.get("archivos", []) if n != nombre]
+                    todas[clave] = suc
+                    escribir_json(ARCHIVO_LISTAS, todas)
+            self._responder(200, '{"ok":true}')
+
+        elif ruta.path == "/api/listas/crear":
+            datos = self._json_body()
+            clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
+            nombre = str(datos.get("nombre", "")).strip()[:40] or "Sin nombre"
+            with CANDADO:
+                todas, suc = _listas_crudas(clave)
+                lid = "l" + str(int(time.time() * 1000))[-9:]
+                suc["listas"][lid] = {"nombre": nombre, "archivos": []}
+                todas[clave] = suc
+                escribir_json(ARCHIVO_LISTAS, todas)
+            self._responder(200, json.dumps({"ok": True, "id": lid}))
+
+        elif ruta.path == "/api/listas/renombrar":
+            datos = self._json_body()
+            clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
+            lid = str(datos.get("id", ""))[:40]
+            nombre = str(datos.get("nombre", "")).strip()[:40]
+            with CANDADO:
+                todas, suc = _listas_crudas(clave)
+                if lid in suc["listas"] and nombre:
+                    suc["listas"][lid]["nombre"] = nombre
+                    todas[clave] = suc
+                    escribir_json(ARCHIVO_LISTAS, todas)
+            self._responder(200, '{"ok":true}')
+
+        elif ruta.path == "/api/listas/eliminar":
+            datos = self._json_body()
+            clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
+            lid = str(datos.get("id", ""))[:40]
+            with CANDADO:
+                todas, suc = _listas_crudas(clave)
+                if lid in suc["listas"] and len(suc["listas"]) > 1:
+                    del suc["listas"][lid]
+                    if suc.get("activa") == lid:
+                        suc["activa"] = next(iter(suc["listas"]))
+                    todas[clave] = suc
+                    escribir_json(ARCHIVO_LISTAS, todas)
+                    # pantallas que la tenian asignada vuelven a la activa
+                    tvs = leer_json(ARCHIVO_TVS, {})
+                    for info in tvs.values():
+                        if info.get("lista") == lid:
+                            info["lista"] = ""
+                    escribir_json(ARCHIVO_TVS, tvs)
+                else:
+                    self._responder(400, '{"error":"no se puede eliminar la unica lista"}')
+                    return
+            self._responder(200, '{"ok":true}')
+
+        elif ruta.path == "/api/listas/activar":
+            datos = self._json_body()
+            clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
+            lid = str(datos.get("id", ""))[:40]
+            with CANDADO:
+                todas, suc = _listas_crudas(clave)
+                if lid in suc["listas"]:
+                    suc["activa"] = lid
+                    todas[clave] = suc
+                    escribir_json(ARCHIVO_LISTAS, todas)
+            self._responder(200, '{"ok":true}')
+
+        elif ruta.path == "/api/listas/contenido":
+            datos = self._json_body()
+            clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
+            lid = str(datos.get("id", ""))[:40]
+            with CANDADO:
+                todas, suc = _listas_crudas(clave)
+                if lid not in suc["listas"]:
+                    self._responder(400, '{"error":"lista no encontrada"}')
+                    return
+                actuales = list(suc["listas"][lid].get("archivos", []))
+                en_disco = set(lista_archivos(clave))
+                for n in (datos.get("agregar") or []):
+                    n = nombre_seguro(n)
+                    if n in en_disco and n not in actuales:
+                        actuales.append(n)
+                quitar = {nombre_seguro(n) for n in (datos.get("quitar") or [])}
+                actuales = [n for n in actuales if n not in quitar]
+                suc["listas"][lid]["archivos"] = actuales
+                todas[clave] = suc
+                escribir_json(ARCHIVO_LISTAS, todas)
             self._responder(200, '{"ok":true}')
 
         elif ruta.path == "/api/mover":
@@ -1086,15 +1274,16 @@ class Manejador(BaseHTTPRequestHandler):
             clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
             nombre = nombre_seguro(datos.get("nombre", ""))
             dir_ = int(datos.get("dir", 0))
-            orden = lista_archivos(clave)
+            lid = str(datos.get("lista", ""))[:40]
+            orden = archivos_de_lista(clave, lid)
             if nombre in orden:
                 i = orden.index(nombre)
                 j = i + dir_
                 if 0 <= j < len(orden):
                     orden[i], orden[j] = orden[j], orden[i]
-                    ordenes = leer_json(ARCHIVO_ORDENES, {})
-                    ordenes[clave] = orden
-                    escribir_json(ARCHIVO_ORDENES, ordenes)
+                    if not lid:
+                        lid = listas_de(clave)["activa"]
+                    guardar_lista(clave, lid, orden)
             self._responder(200, '{"ok":true}')
 
         elif ruta.path == "/api/turno":
@@ -1174,6 +1363,8 @@ class Manejador(BaseHTTPRequestHandler):
                         tvs[id_tv]["zona"] = str(datos["zona"])[:40].strip()
                     if "turnos" in datos:
                         tvs[id_tv]["turnos"] = bool(datos["turnos"])
+                    if "lista" in datos:
+                        tvs[id_tv]["lista"] = str(datos["lista"])[:40]
                     if "sucursal" in datos and existe_sucursal(clave_segura(datos["sucursal"])):
                         tvs[id_tv]["sucursal"] = clave_segura(datos["sucursal"])
                     escribir_json(ARCHIVO_TVS, tvs)
@@ -1562,11 +1753,34 @@ PANEL_HTML = """<!DOCTYPE html>
   </section>
 
   <section class="card">
-    <h2>Lista de reproducción</h2>
+    <h2>Listas de reproducción</h2>
+    <div class="fila" style="flex-wrap:wrap">
+      <select class="claro" id="listaSel" style="min-width:190px"></select>
+      <span id="listaAlAire" style="font-size:12.5px"></span>
+      <button class="btn btn-primario btn-mini" id="listaAlAireBtn">Poner al aire</button>
+      <button class="btn btn-mini" id="listaNueva">Nueva</button>
+      <button class="btn btn-mini" id="listaRenombrar">Renombrar</button>
+      <button class="btn btn-mini btn-peligro" id="listaBorrar">Eliminar lista</button>
+    </div>
+    <p class="nota">La lista «al aire» es la que ven las pantallas de esta sucursal
+    (salvo las que tengan otra lista asignada). Quitar contenido de una lista NO lo
+    borra: sigue guardado en la Biblioteca para reutilizarlo cuando quieras.</p>
+  </section>
+
+  <section class="card">
+    <h2>Contenido de <span id="listaNombre">la lista</span></h2>
     <ul id="lista"></ul>
     <p class="nota">Con «Enviar a…» reproduces ese contenido al momento en la pantalla que elijas
     (tarda unos 4 segundos); las fotos se muestran sus segundos configurados y regresa
     el bucle. Si quieres una foto fija hasta que tú decidas, usa «Mostrar al cliente».</p>
+  </section>
+
+  <section class="card">
+    <h2>Biblioteca <span id="bibCuantos" style="color:var(--gris); font-weight:400"></span></h2>
+    <ul id="biblioteca"></ul>
+    <p class="nota">Todo el contenido guardado en la nube de esta sucursal. «Agregar»
+    lo suma a la lista que estás editando; «Eliminar de la nube» sí lo borra para
+    siempre de todas las listas.</p>
   </section>
 
 </main>
@@ -1698,6 +1912,10 @@ async function cargarTvs() {
         Turnos
       </label>
       <div class="acciones">
+        <select class="claro sel-lista" title="Lista que reproduce esta pantalla">
+          <option value="">Lista al aire</option>
+          ${listasDisponibles.map(l => `<option value="${l.id}" ${l.id === t.lista ? "selected" : ""}>${l.nombre}</option>`).join("")}
+        </select>
         ${yo.rol === "admin" ? `<select class="claro sel-mover" title="Mover de sucursal">${
           todasSucursales.map(s => `<option value="${s.clave}" ${s.clave === sucursal ? "selected" : ""}>${s.nombre}</option>`).join("")
         }</select>` : ""}
@@ -1725,6 +1943,13 @@ async function cargarTvs() {
       mute.innerHTML = t.silencio ? ICONO_MUDO : ICONO_SONIDO;
       mute.style.color = t.silencio ? "#FF5A5F" : "";
       comando(t.id, t.silencio ? "silencio" : "sonido");
+    };
+    const selLista = li.querySelector(".sel-lista");
+    selLista.onchange = async () => {
+      await fetch("/api/tv", { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: t.id, lista: selLista.value }) });
+      avisoGuardado();
     };
     const swTurnos = li.querySelector(".sw-turnos");
     swTurnos.onchange = async () => {
@@ -1852,23 +2077,49 @@ async function guardarCampana(nombre, cont) {
   avisoGuardado(); cargar();
 }
 
-async function cargar() {
-  const r = await fetch("/api/lista?sucursal=" + sucursal);
-  const archivos = await r.json();
-  const normales = archivos.filter(a => !a.programa);
-  const camps = archivos.filter(a => a.programa);
+let listaActual = "";
+let listaActiva = "";
+let listasDisponibles = [];
 
-  /* --- campañas programadas --- */
-  const sel = $("campSel");
-  sel.innerHTML = '<option value="">Elegir contenido…</option>' +
-    normales.map(a => `<option value="${a.nombre}">${a.nombre}</option>`).join("");
+async function cargarListas() {
+  const r = await fetch("/api/listas?sucursal=" + sucursal);
+  const info = await r.json();
+  listaActiva = info.activa;
+  listasDisponibles = info.listas;
+  if (!info.listas.some(l => l.id === listaActual)) listaActual = info.activa;
+  const sel = $("listaSel");
+  sel.innerHTML = info.listas.map(l =>
+    `<option value="${l.id}" ${l.id === listaActual ? "selected" : ""}>${l.nombre} (${l.cuantos})</option>`).join("");
+  const nom = info.listas.find(l => l.id === listaActual);
+  $("listaNombre").textContent = nom ? nom.nombre : "la lista";
+  const alAire = listaActual === listaActiva;
+  $("listaAlAire").innerHTML = alAire
+    ? '<span style="color:#2E9E5B; font-weight:600">● al aire ahora</span>'
+    : '<span style="color:var(--gris)">○ en edición</span>';
+  $("listaAlAireBtn").style.display = alAire ? "none" : "";
+  return info;
+}
+
+async function cargar() {
+  await cargarListas();
+
+  const r = await fetch(`/api/lista?sucursal=${sucursal}&lista=${listaActual}`);
+  const enLista = await r.json();
+  const rb = await fetch("/api/biblioteca?sucursal=" + sucursal);
+  const todos = await rb.json();
+
+  /* --- campañas programadas (sobre toda la biblioteca) --- */
+  const conProg = enLista.filter(a => a.programa);
+  const sinProg = todos.filter(a => !conProg.some(c => c.nombre === a.nombre));
+  const selc = $("campSel");
+  selc.innerHTML = '<option value="">Elegir contenido…</option>' +
+    sinProg.map(a => `<option value="${a.nombre}">${a.nombre}</option>`).join("");
   const ulc = $("campanas");
   ulc.innerHTML = "";
-  camps.forEach(a => {
+  conProg.forEach(a => {
     const li = document.createElement("li");
     li.style.flexWrap = "wrap";
-    const mini = a.miniatura ? `<img class="mini" src="${a.miniatura}" alt="">`
-                             : `<div class="mini"></div>`;
+    const mini = a.miniatura ? `<img class="mini" src="${a.miniatura}" alt="">` : `<div class="mini"></div>`;
     li.innerHTML = `
       ${mini}
       <div class="info">
@@ -1892,7 +2143,7 @@ async function cargar() {
       li.appendChild(ed);
     };
     quitar.onclick = async () => {
-      if (!confirm(`"${a.nombre}" volverá a la lista de todos los días. ¿Continuar?`)) return;
+      if (!confirm(`"${a.nombre}" dejará de tener horario y se mostrará siempre que esté en una lista al aire. ¿Continuar?`)) return;
       await fetch("/api/programar", { method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sucursal, nombre: a.nombre, dias: [] }) });
@@ -1900,34 +2151,35 @@ async function cargar() {
     };
     ulc.appendChild(li);
   });
-  if (!camps.length)
-    ulc.innerHTML = '<li class="vacio">Sin campañas. Elige un contenido arriba y ponle sus días, fechas u horario.</li>';
+  if (!conProg.length)
+    ulc.innerHTML = '<li class="vacio">Sin campañas. Elige un contenido y ponle sus días, fechas u horario.</li>';
 
-  /* --- lista de todos los dias --- */
+  /* --- contenido de la lista en edición --- */
   const ul = $("lista");
   ul.innerHTML = "";
-  if (!normales.length) {
-    ul.innerHTML = '<li class="vacio">Aún no hay contenido en esta sucursal.</li>';
-    return;
+  if (!enLista.length) {
+    ul.innerHTML = '<li class="vacio">Esta lista está vacía. Agrégale contenido desde la Biblioteca.</li>';
   }
-  normales.forEach((a, i) => {
+  enLista.forEach((a, i) => {
     const li = document.createElement("li");
-    const mini = a.miniatura ? `<img class="mini" src="${a.miniatura}" alt="">`
-                             : `<div class="mini"></div>`;
+    if (a.programa && !a.activo) li.style.opacity = "0.5";
+    const mini = a.miniatura ? `<img class="mini" src="${a.miniatura}" alt="">` : `<div class="mini"></div>`;
     const dur = a.tipo === "imagen"
       ? `· <input class="dur" type="number" min="3" max="120" value="${a.duracion}"> seg` : "";
+    const prog = a.programa
+      ? ` · <span style="color:var(--rosa-fuerte)">${resumenPrograma(a.programa, a.activo)}</span>` : "";
     li.innerHTML = `
       <span class="orden">${i + 1}</span>
       ${mini}
       <div class="info">
         <div class="nombre">${a.nombre}</div>
-        <div class="detalle">${a.tipo === "imagen" ? "Foto" : "Video"} ${dur}</div>
+        <div class="detalle">${a.tipo === "imagen" ? "Foto" : "Video"} ${dur}${prog}</div>
       </div>
       <div class="acciones">
         <select class="enviar">${opcionesEnviar()}</select>
         <button class="btn btn-icono" title="Subir" ${i === 0 ? "disabled" : ""}>↑</button>
-        <button class="btn btn-icono" title="Bajar" ${i === normales.length - 1 ? "disabled" : ""}>↓</button>
-        <button class="btn btn-mini btn-peligro">Eliminar</button>
+        <button class="btn btn-icono" title="Bajar" ${i === enLista.length - 1 ? "disabled" : ""}>↓</button>
+        <button class="btn btn-mini" title="Quitar de esta lista (no se borra)">Quitar</button>
       </div>`;
     const durInput = li.querySelector(".dur");
     if (durInput) durInput.onchange = () => guardarDuracion(a.nombre, durInput.value);
@@ -1936,13 +2188,88 @@ async function cargar() {
       if (enviar.value) comando(enviar.value, "reproducir", a.nombre);
       enviar.value = "";
     };
-    const [sube, baja, borra] = li.querySelectorAll("button");
+    const [sube, baja, quita] = li.querySelectorAll("button");
     sube.onclick = () => mover(a.nombre, -1);
     baja.onclick = () => mover(a.nombre, 1);
-    borra.onclick = () => { if (confirm(`¿Eliminar "${a.nombre}"?`)) eliminar(a.nombre); };
+    quita.onclick = () => cambiarEnLista({ quitar: [a.nombre] });
     ul.appendChild(li);
   });
+
+  /* --- biblioteca --- */
+  const ulb = $("biblioteca");
+  ulb.innerHTML = "";
+  $("bibCuantos").textContent = `· ${todos.length} en la nube`;
+  if (!todos.length) {
+    ulb.innerHTML = '<li class="vacio">Aún no hay contenido en esta sucursal.</li>';
+    return;
+  }
+  const enEsta = new Set(enLista.map(a => a.nombre));
+  todos.forEach(a => {
+    const li = document.createElement("li");
+    const mini = a.miniatura ? `<img class="mini" src="${a.miniatura}" alt="">` : `<div class="mini"></div>`;
+    const donde = a.listas.length ? a.listas.join(" · ") : "en ninguna lista";
+    const ya = enEsta.has(a.nombre);
+    li.innerHTML = `
+      ${mini}
+      <div class="info">
+        <div class="nombre">${a.nombre}</div>
+        <div class="detalle">${a.tipo === "imagen" ? "Foto" : "Video"} · ${donde}</div>
+      </div>
+      <div class="acciones">
+        <button class="btn btn-mini ${ya ? "" : "btn-primario"}" ${ya ? "disabled" : ""}>${ya ? "Ya en la lista" : "Agregar"}</button>
+        <button class="btn btn-mini btn-peligro">Eliminar de la nube</button>
+      </div>`;
+    const [agregar, borrar] = li.querySelectorAll("button");
+    agregar.onclick = () => cambiarEnLista({ agregar: [a.nombre] });
+    borrar.onclick = () => {
+      if (!confirm(`¿Eliminar "${a.nombre}" de la nube?\nSe quitará de TODAS las listas y no se podrá recuperar.`)) return;
+      eliminar(a.nombre);
+    };
+    ulb.appendChild(li);
+  });
 }
+
+async function cambiarEnLista(cambio) {
+  await fetch("/api/listas/contenido", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sucursal, id: listaActual, ...cambio }) });
+  avisoGuardado(); cargar();
+}
+
+$("listaSel").onchange = () => { listaActual = $("listaSel").value; cargar(); };
+$("listaAlAireBtn").onclick = async () => {
+  await fetch("/api/listas/activar", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sucursal, id: listaActual }) });
+  avisoGuardado(); cargar(); cargarTvs();
+};
+$("listaNueva").onclick = async () => {
+  const nombre = prompt("Nombre de la nueva lista (ej. Día de las Madres)");
+  if (!nombre) return;
+  const r = await fetch("/api/listas/crear", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sucursal, nombre }) });
+  const d = await r.json();
+  if (d.id) listaActual = d.id;
+  avisoGuardado(); cargar();
+};
+$("listaRenombrar").onclick = async () => {
+  const nombre = prompt("Nuevo nombre de la lista");
+  if (!nombre) return;
+  await fetch("/api/listas/renombrar", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sucursal, id: listaActual, nombre }) });
+  avisoGuardado(); cargar();
+};
+$("listaBorrar").onclick = async () => {
+  if (!confirm("¿Eliminar esta lista? El contenido NO se borra, sigue en la Biblioteca.")) return;
+  const r = await fetch("/api/listas/eliminar", { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sucursal, id: listaActual }) });
+  if (!r.ok) { alert("No se puede eliminar la única lista de la sucursal."); return; }
+  listaActual = "";
+  avisoGuardado(); cargar(); cargarTvs();
+};
 
 $("campCampos").innerHTML = camposCampana();
 $("campCrear").onclick = () => {
@@ -1961,9 +2288,10 @@ async function guardarDuracion(nombre, segundos) {
 async function mover(nombre, dir) {
   await fetch("/api/mover", { method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sucursal, nombre, dir }) });
+    body: JSON.stringify({ sucursal, nombre, dir, lista: listaActual }) });
   cargar();
 }
+
 async function eliminar(nombre) {
   await fetch("/api/eliminar", { method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -2014,7 +2342,7 @@ function subir(files) {
   [...files].forEach(async f => {
     const prep = await prepararArchivo(f);
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/subir?sucursal=" + sucursal + "&nombre=" + encodeURIComponent(prep.nombre));
+    xhr.open("POST", "/api/subir?sucursal=" + sucursal + "&lista=" + listaActual + "&nombre=" + encodeURIComponent(prep.nombre));
     xhr.upload.onprogress = e => {
       if (e.lengthComputable) {
         const p = Math.round(e.loaded / e.total * 100);
@@ -2144,6 +2472,7 @@ $("velocidad").onchange = () => guardarAjustes();
 (async () => {
   await cargarYo();
   await cargarSucursales();
+  await cargarListas();
   cargarTvs(); cargar(); cargarAjustes(); cargarPendientes(); cargarStats();
   setInterval(() => { cargarTvs(); cargarPendientes(); }, 8000);
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
