@@ -1,4 +1,4 @@
-# Reproductor Roku — continuidad y recuperación (app 5.2 build 59)
+# Reproductor Roku — continuidad y recuperación (app 5.2 build 60)
 
 Qué hace la app cuando falla la red o un archivo, qué garantiza y qué no.
 Referencia para operación, para QA y para las pruebas en TV física.
@@ -70,7 +70,7 @@ Ningún mensaje técnico en grande. El botón `*` sigue abriendo el diálogo de 
 | Presupuesto | Se comprueba **antes** de bajar (tamaño por `HEAD`; el servidor 6.10 lo responde, el 6.9 no) y cada 2 s **durante** la descarga; se revalida al confirmar | `CacheTask.brs` |
 | Tamaño desconocido (sin `HEAD`) | Se reserva el tope por archivo (80 MB) y se desaloja lo más viejo hasta que quepa esa reserva | `CacheTask.brs` |
 | Reintentos de descarga | 6 intentos por archivo con esperas de 30, 60, 120, 240 y 300 s. El estado (intentos, espera, terminal) vive en un registro por URL y **no** se reinicia al reconciliar | `CacheTask.brs` |
-| Fallos terminales | 404/403/410 y "demasiado grande": cuarentena de 30 min y luego un ciclo nuevo. "Sin espacio": hasta que cambie la lista. "Agotado" (6 intentos): hasta que vuelva la red | `CacheTask.brs` |
+| Fallos terminales | 404/403/410 y "demasiado grande": cuarentena de 30 min y luego un ciclo nuevo. "Sin espacio": hasta que cambie el conjunto de la lista o se libere espacio (una reconciliación con la misma lista no cuenta). "Agotado" (6 intentos): hasta que vuelva la red | `CacheTask.brs` |
 | Reconciliación de cache | Al cambiar la lista, al reconectar, en la primera lista en vivo tras arrancar desde cache, y como máximo cada 60 s | `MainScene.brs` |
 | Descarga colgada | < 8 KB/s durante 20 s | `CacheTask.brs` |
 | Arranque sin lista | lámina a los 15 s; lista guardada a los 12 s | ambos |
@@ -87,12 +87,21 @@ sigue funcionando contra el mismo servidor durante la convivencia.
 
 ---
 
+## Validación fuera del dispositivo — ejecutada
+
+La **planificación** de la cache (reintentos, esperas, cola, cuarentenas) se
+ejecuta con el intérprete `brs` sobre el código real de `CacheTask.brs`:
+`python3 roku-app/pruebas/correr.py` → 35 comprobaciones, 0 fallos (build 60).
+Eso demuestra *qué* se intenta y *cuándo*; no demuestra la transferencia, la
+reproducción ni `cachefs:`.
+
 ## Validación en TV física — pendiente del propietario
 
 Lo que sigue **no lo puedo ejecutar yo**. Compilé con el compilador de
-BrightScript (cero diagnósticos), pero el comportamiento real del nodo de
-video, de `cachefs:` y del reloj solo se comprueba en un equipo. Hasta
-entonces, B1 está **implementado y sin aprobar**.
+BrightScript (cero diagnósticos) y ejecuté la planificación con `brs`, pero el
+comportamiento real del nodo de video, de `cachefs:`, de la red y del reloj
+solo se comprueba en un equipo. Hasta entonces, B1 está **implementado y sin
+aprobar**.
 
 Preparación: una TV de pruebas (la de casa, que ya hace de canaria), la app
 5.2 instalada por modo desarrollador, una sucursal de prueba con al menos dos

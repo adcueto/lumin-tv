@@ -24,7 +24,8 @@
 '   - Reintentos: 30, 60, 120, 240 y 300 s; a la sexta falla queda "agotado".
 '   - Fallos terminales y cuando vuelven a intentarse:
 '       404/403/410 y demasiado grande ....... a los 30 min
-'       sin espacio .......................... cuando cambia la lista
+'       sin espacio .......................... cuando cambia el conjunto de la
+'                                              lista o se libera espacio
 '       agotado / red ........................ cuando vuelve la conexion
 '       la URL sale de la lista .............. su estado se olvida; si vuelve,
 '                                              empieza de cero
@@ -36,7 +37,9 @@ sub init()
     m.top.functionName = "ejecutar"
 end sub
 
-sub ejecutar()
+' Parametros y estado inicial. Separado de ejecutar() para que el arnes de
+' roku-app/pruebas/ pueda ejercitar la planificacion sin el bucle infinito.
+sub configurar()
     m.TOPE_TOTAL = 250 * 1024 * 1024      ' 250 MB en RAM compartida: conservador
     m.MARGEN = 20 * 1024 * 1024           ' reservado para la reproduccion en curso
     m.TOPE_ARCHIVO = 80 * 1024 * 1024
@@ -45,6 +48,14 @@ sub ejecutar()
     m.MAX_INTENTOS = 6                    ' 5 esperas: 30, 60, 120, 240, 300 s
     m.CUARENTENA_404_MS = 30 * 60 * 1000
 
+    m.registro = {}
+    m.cola = []
+    m.activo = ""
+    m.deseadas = {}
+end sub
+
+sub ejecutar()
+    configurar()
     m.fs = CreateObject("roFileSystem")
     m.port = CreateObject("roMessagePort")
     m.top.observeField("deseados", m.port)
@@ -52,11 +63,6 @@ sub ejecutar()
 
     limpiarTemporales()
     bytesEnCache()
-
-    m.registro = {}
-    m.cola = []
-    m.activo = ""
-    m.deseadas = {}
 
     while true
         espera = milisegundosHastaElSiguiente()
@@ -68,45 +74,57 @@ sub ejecutar()
             msg = m.port.GetMessage()
         end if
         atenderMensaje(msg)
-
-        url = siguienteListo()
-        if url <> ""
-            m.activo = url
-            ruta = rutaDeCache(url)
-            if m.fs.Exists(ruta)
-                m.registro.Delete(url)
-                m.top.listo = {url: url, ruta: ruta}
-            else
-                resultado = descargar(url, ruta)
-                if resultado = "ok"
-                    m.registro.Delete(url)
-                    revalidarTotal()
-                    m.top.listo = {url: url, ruta: ruta}
-                else if resultado <> "obsoleto"
-                    registrarFallo(url, resultado)
-                end if
-            end if
-            m.activo = ""
-        end if
+        procesarSiguiente()
     end while
 end sub
+
+' Un ciclo de trabajo: toma la siguiente URL lista, la baja y registra el
+' resultado. Devuelve false si no habia nada listo.
+function procesarSiguiente() as boolean
+    url = siguienteListo()
+    if url = "" then return false
+    m.activo = url
+    ruta = rutaDeCache(url)
+    yaEstaba = m.fs.Exists(ruta)
+    if yaEstaba
+        resultado = "ok"
+    else
+        resultado = descargar(url, ruta)
+    end if
+    ' R3-B1-01: la transferencia termino. Se cierra el estado activo ANTES de
+    ' programar el siguiente intento; si no, encolar() rechazaria el reintento
+    ' por creer que la URL sigue bajando y la espera de 30 s nunca vencia.
+    m.activo = ""
+    if resultado = "ok"
+        m.registro.Delete(url)
+        if not yaEstaba then revalidarTotal()
+        m.top.listo = {url: url, ruta: ruta}
+    else if resultado <> "obsoleto"
+        registrarFallo(url, resultado)
+    end if
+    return true
+end function
 
 sub atenderMensaje(msg as dynamic)
     if type(msg) <> "roSGNodeEvent" then return
     if msg.getField() = "deseados"
         aplicarDeseados(msg.getData())
     else if msg.getField() = "reconectado"
-        ' volvio la red: lo que se agoto por red merece otra oportunidad
-        for each url in m.registro.Keys()
-            e = m.registro[url]
-            if e.terminal and e.motivo = "agotado"
-                e.terminal = false
-                e.intentos = 0
-                e.noAntesDe = 0
-                encolar(url)
-            end if
-        end for
+        reanimarAgotados()
     end if
+end sub
+
+' Volvio la red: lo que se agoto por red merece otra oportunidad.
+sub reanimarAgotados()
+    for each url in m.registro.Keys()
+        e = m.registro[url]
+        if e.terminal and e.motivo = "agotado"
+            e.terminal = false
+            e.intentos = 0
+            e.noAntesDe = 0
+            encolar(url)
+        end if
+    end for
 end sub
 
 ' ---- registro y cola ----
@@ -135,22 +153,28 @@ sub aplicarDeseados(d as object)
             if it.url <> invalid and it.url <> "" then nuevas[it.url] = true
         end for
     end if
+    ' R3-B1-02: una reconciliacion con la MISMA lista no es un cambio. Solo
+    ' un conjunto distinto de URLs, o espacio liberado de verdad, cambia la
+    ' condicion de exito de un "sin espacio".
+    cambioConjunto = conjuntosDistintos(m.deseadas, nuevas)
     m.deseadas = nuevas
 
     ' 1. lo que salio de la lista: se olvida su estado y se libera su espacio
     for each url in m.registro.Keys()
         if not nuevas.DoesExist(url) then m.registro.Delete(url)
     end for
-    desalojarNoDeseados()
+    liberado = desalojarNoDeseados()
 
-    ' 2. la lista nueva puede haber liberado espacio: "sin espacio" se reintenta
-    for each url in m.registro.Keys()
-        e = m.registro[url]
-        if e.terminal and e.motivo = "sin_espacio"
-            e.terminal = false
-            e.noAntesDe = 0
-        end if
-    end for
+    ' 2. "sin espacio" se reintenta solo si cambio la lista o se libero espacio
+    if cambioConjunto or liberado > 0
+        for each url in m.registro.Keys()
+            e = m.registro[url]
+            if e.terminal and e.motivo = "sin_espacio"
+                e.terminal = false
+                e.noAntesDe = 0
+            end if
+        end for
+    end if
 
     ' 3. reconstruir la cola sin tocar el registro (intentos y esperas se
     '    conservan) y sin volver a meter la descarga activa
@@ -162,6 +186,14 @@ sub aplicarDeseados(d as object)
         end if
     end for
 end sub
+
+function conjuntosDistintos(a as object, b as object) as boolean
+    if a.Count() <> b.Count() then return true
+    for each k in a.Keys()
+        if not b.DoesExist(k) then return true
+    end for
+    return false
+end function
 
 function siguienteListo() as string
     ahora = ahoraMs()
@@ -247,6 +279,11 @@ end function
 ' ---- descarga con presupuesto ----
 
 function descargar(url as string, destino as string) as string
+    ' Arnes fuera del dispositivo (roku-app/pruebas/): simula el resultado de
+    ' la transferencia para ejercitar la planificacion real. En la TV
+    ' m.simulacion no existe nunca.
+    if m.simulacion <> invalid then return m.simulacion.descargar(url, destino)
+
     ' 1. tamano anunciado. Si el servidor no lo dice, se reserva el tope por
     '    archivo: conservador, pero nunca deja de desalojar lo viejo.
     tamano = tamanoRemoto(url)
@@ -408,18 +445,23 @@ function rutasProtegidas() as object
 end function
 
 ' Borra todo lo que ya no esta en la lista, sin esperar a que falte espacio.
-sub desalojarNoDeseados()
+' Devuelve los bytes liberados de verdad.
+function desalojarNoDeseados() as integer
     protegidas = rutasProtegidas()
     total = 0
+    liberado = 0
     for each a in listarCache()
         if protegidas.DoesExist(a.ruta)
             total = total + a.bytes
+        else if m.fs.Delete(a.ruta)
+            liberado = liberado + a.bytes
         else
-            m.fs.Delete(a.ruta)
+            total = total + a.bytes
         end if
     end for
     m.top.bytesEnCache = total
-end sub
+    return liberado
+end function
 
 ' Borra hasta que el total quede por debajo de `objetivo`: primero lo que no
 ' esta en la lista, luego lo deseado mas viejo. Nunca el temporal activo.

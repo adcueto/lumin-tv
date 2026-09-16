@@ -1,15 +1,35 @@
-# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 2)
+# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 3)
 
 Para revisión de Adrián y Codex **antes de escribir código**.
-Fecha: 2026-09-16 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 59)
+Fecha: 2026-09-16 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 60)
 
-## Qué cambia en esta revisión 2 (respuesta a `14-qa-R2-y-diseno-B3-5c96845.md`)
+## Qué cambia en esta revisión 3 (respuesta a `15-qa-R3-y-diseno-B3-rev2-78306df.md`)
+
+Las tres objeciones se **CONFIRMAN**. Esta vez cada corrección viene con un
+**ensayo ejecutable** contra PostgreSQL 16 real y datos sintéticos, en
+`servidor/ensayos_b3/` (21 ensayos; se omiten, no pasan, si no hay base de
+ensayo). No es implementación de B3: es el diseño demostrado antes de
+programarlo.
+
+| Objeción de Codex | Decisión | Dónde | Ensayo |
+|---|---|---|---|
+| B3-R2-01 `max(bigserial)` no representa el orden de confirmación | **CONFIRMADO.** El espejo ya no mira `max(id)`. Procesa las marcas **pendientes que ve** (`procesada_en IS NULL`: solo confirmadas) dentro de **una instantánea `REPEATABLE READ`** que también lee todos los documentos; escribe los archivos; y **solo después** marca esas filas. Una marca de una transacción aún abierta no se ve, no se marca y se procesa en el ciclo siguiente a su confirmación. Converge solo; sin nueva escritura | §7.4 | `test_ensayo_espejo.py`: el protocolo viejo **pierde A** con el orden exacto A-reserva/B-confirma/espejo/A-confirma; el nuevo converge; más los tres cortes (tras escribir y antes de marcar, a mitad de los archivos, fallo al persistir el marcador en disco) |
+| B3-R2-02 la copia congelada resucita sesiones revocadas | **CONFIRMADO.** `sesiones.json` deja de estar congelado: el espejo lo **regenera** como *copia congelada ∩ sesiones vigentes en PostgreSQL* (hash presente, `revocada_en IS NULL`, no vencida, usuario activo). Un logout durante B3 desaparece del archivo en el siguiente ciclo. Las creadas después del corte siguen sin poder volcarse (solo hash) y quedan cerradas al revertir. No hay tokens nuevos en claro en ningún lado | §7.6 | `test_ensayo_sesiones.py`, con el **servidor 6.10 real**: reproduce el defecto y comprueba el contrato corregido |
+| B3-R2-03 permisos: `GRANT INSERT` sin política bloquea el outbox; `FORCE` anula la exención del propietario; el hilo espejo no tiene rol | **CONFIRMADO.** Matriz completa rol/tabla/operación/política. Políticas `FOR INSERT … WITH CHECK` explícitas para `espejo_marca` y `auditoria`. Tercer rol **`lumin_espejo`** (lee todo; solo escribe `espejo_marca.procesada_en` y `espejo_estado`). **`ENABLE`, no `FORCE`**: el propietario `lumin_migracion` queda exento y es quien migra, respalda y restaura; `lumin_app` y `lumin_espejo` no son propietarios de nada. Sin `BYPASSRLS` para nadie | §3.5 | `test_ensayo_rls.py`: cada operación con su rol real, controles negativos, `pg_dump` + `pg_restore` con las políticas dentro, demostración de por qué no `FORCE`, guardián de catálogo |
+| Precisiones: §7.4 "13 documentos" vs sesiones; §3.5 arranque con `empresa_id NULL`; §8b límites de publicación y digest por destino; §7.3 número de turno y IPs | Incorporadas | §7.4, §3.5, §8b, §7.3 | — |
+
+Hallazgo propio del ensayo, incorporado: la política de `sesion` necesitaba
+`WITH CHECK (token_hash = gc('token_hash') OR usuario_id = …)`; con solo
+`usuario_id` el logout (que revoca durante la resolución de la cookie, cuando el
+contexto aún no tiene `usuario_id`) fallaba por RLS.
+
+## Qué cambió en la revisión 2 (respuesta a `14-qa-R2-y-diseno-B3-5c96845.md`)
 
 | Objeción de Codex | Decisión | Dónde |
 |---|---|---|
-| B3-QA-01 la escritura doble no define recuperación ante escritura parcial | **CONFIRMADO.** Se sustituye "escribir en los dos lados" por un **espejo derivado**: cada transacción deja una marca en una tabla de salida (`espejo_marca`) dentro de la misma transacción; un único hilo regenera los JSON completos **desde PostgreSQL** y anota hasta qué marca llegó. La reversión se **bloquea** si hay marcas sin aplicar. Con PostgreSQL caído no hay escritura en ningún lado | §7.4 |
-| B3-QA-02 la exportación no puede reconstruir sesiones desde el hash | **CONFIRMADO.** El espejo **no toca** `sesiones.json`: queda congelado en su estado del corte. Contrato explícito: toda reversión conserva las sesiones anteriores al corte y **cierra** las creadas después; esas personas vuelven a entrar. Sin tokens en claro | §7.6 |
-| B3-QA-03 `lista_elemento` fuera de la política; contrato del rol incompleto; guardián textual insuficiente | **CONFIRMADO.** `lista_elemento` gana `empresa_id` con llaves compuestas y política propia. Contrato del rol: no propietario, `FORCE ROW LEVEL SECURITY`, `NOINHERIT`, sin `SET ROLE`. Políticas concretas para las tablas de identidad. El guardián textual se reemplaza por controles negativos ejecutados como `lumin_app` sin JOIN | §3.2, §3.5, §6.3 |
+| B3-QA-01 la escritura doble no define recuperación ante escritura parcial | **CONFIRMADO.** Se sustituye "escribir en los dos lados" por un **espejo derivado**: cada transacción deja una marca en una tabla de salida (`espejo_marca`) dentro de la misma transacción; un único hilo regenera los JSON completos **desde PostgreSQL** y marca las filas que procesó (en la rev. 3, por marcas pendientes, no por `max(id)`). La reversión se **bloquea** si hay marcas sin aplicar. Con PostgreSQL caído no hay escritura en ningún lado | §7.4 |
+| B3-QA-02 la exportación no puede reconstruir sesiones desde el hash | **CONFIRMADO** (superado en rev. 3 por B3-R2-02). El espejo **no toca** `sesiones.json`: queda congelado en su estado del corte. Contrato explícito: toda reversión conserva las sesiones anteriores al corte y **cierra** las creadas después; esas personas vuelven a entrar. Sin tokens en claro | §7.6 |
+| B3-QA-03 `lista_elemento` fuera de la política; contrato del rol incompleto; guardián textual insuficiente | **CONFIRMADO.** `lista_elemento` gana `empresa_id` con llaves compuestas y política propia. Contrato del rol: no propietario, `NOINHERIT`, sin `SET ROLE` (el `FORCE` de esta revisión se retira en la 3, ver B3-R2-03). Políticas concretas para las tablas de identidad. El guardián textual se reemplaza por controles negativos ejecutados como `lumin_app` sin JOIN | §3.2, §3.5, §6.3 |
 | B3-QA-04 la petición pública del medio no identifica la empresa | **CONFIRMADO.** Contrato explícito de B3: las rutas heredadas `/videos/<clave>/…` resuelven **solo** dentro de la **empresa heredada** (configurada, LUMIN) y **ninguna segunda empresa puede activarse** hasta que exista un espacio de nombres verificable (B8). Se prueba por HTTP real | §8a |
 | B3-QA-05 una pantalla pendiente puede apuntar a una lista de otra empresa | **CONFIRMADO.** `CHECK (lista_id IS NULL OR sucursal_id IS NOT NULL)` y FK adicional `(lista_id, empresa_id)` | §3.1 |
 | Cola: hash por tamaño, posesión, cancelación de `en_curso` | Incorporado: clave por digest del contenido, `posesion` comprobada al publicar, cancelación de `en_curso` | §8b |
@@ -53,10 +73,13 @@ TVs, el POS ni el panel noten el cambio. LUMIN queda como la empresa 1.
    llave natural. Las cookies de sesión vigentes siguen sirviendo. Los nombres
    de usuario y contraseñas actuales siguen funcionando.
 4. **Migración con dos marchas atrás.** Ventana corta con congelación de
-   escrituras; después, **escritura doble** JSON+PostgreSQL durante 7 días, de
-   modo que revertir es volver a apuntar el servidor a los JSON **sin perder lo
-   escrito después del cambio**. Pasada la semana, la reversión es por
-   exportación PostgreSQL → JSON, ensayada.
+   escrituras; después, un **espejo derivado** regenera los 13 JSON desde
+   PostgreSQL durante 7 días (marcas pendientes + instantánea única, §7.4),
+   de modo que revertir es volver a apuntar el servidor a los JSON **sin
+   perder lo escrito después del cambio** y sin resucitar sesiones cerradas
+   (§7.6). Pasada la semana, la reversión es por exportación PostgreSQL → JSON,
+   con la misma verificación. Los tres protocolos delicados (espejo, sesiones,
+   RLS) están **ensayados** contra PostgreSQL 16 en `servidor/ensayos_b3/`.
 
 **Qué no es B3.** No es FastAPI (B5), no es React (B6), no cambia permisos
 (B4: hoy se preservan los efectivos, explícitos), no toca el reproductor, no
@@ -380,16 +403,61 @@ sesión exitoso. Sin esto, la migración bloquearía la operación.
 
 ### 3.5 Row Level Security: contrato completo
 
-**Roles.**
+**Roles (revisión 3).** Tres, con propósito único cada uno. Ninguno es
+`SUPERUSER` ni tiene `BYPASSRLS`; `lumin_app` y `lumin_espejo` son `NOINHERIT`
+y no son miembros de nadie (`SET ROLE` falla, ensayado).
 
-| Rol | Es propietario de las tablas | RLS | Puede |
-|---|---|---|---|
-| `lumin_migracion` | **Sí** | La elude como propietario (Alembic, `migrar_json`, `pg_dump`) | Solo desde consola del VPS |
-| `lumin_app` | **No** | Se le aplica siempre | `SELECT/INSERT/UPDATE/DELETE` por `GRANT`; `NOINHERIT`; **no** puede `SET ROLE lumin_migracion`; sin `SUPERUSER`, sin `BYPASSRLS` |
+| Rol | Propietario de las tablas | RLS | Para qué | Desde dónde |
+|---|---|---|---|---|
+| `lumin_migracion` | **Sí** | `ENABLE`, **no `FORCE`**: como propietario queda **exento** | Alembic, `migrar_json`, `verificar_espejo`, `pg_dump`/`pg_restore` | Solo consola del VPS |
+| `lumin_app` | No | Se le aplica siempre; sin política, cero filas | Las rutas HTTP | El servidor, pool principal |
+| `lumin_espejo` | No | Se le aplica siempre; sus políticas son `USING (true)` **solo de lectura** | El hilo espejo (§7.4) y `exportar_json.py` | El servidor, **una** conexión aparte |
 
-Además, **todas** las tablas llevan `FORCE ROW LEVEL SECURITY`, de modo que
-incluso si por error `lumin_app` llegara a ser propietario de alguna, la
-política seguiría aplicándose (PostgreSQL 16, *Row Security Policies*).
+**Por qué `ENABLE` y no `FORCE`.** Codex tenía razón: `FORCE` somete también al
+propietario, y como no habría política para él, migración, verificación y
+respaldo verían **cero filas** (ensayado: `test_por_que_no_force_rls`). La
+protección que buscaba `FORCE` ("si `lumin_app` llegara a ser propietario") se
+obtiene de otra forma: el guardián de catálogo exige que **ninguna** tabla del
+esquema tenga a `lumin_app` o `lumin_espejo` como propietario y que toda tabla
+tenga RLS activa (`test_ninguna_tabla_sin_rls_ni_politica_para_app`).
+
+**Matriz rol / tabla / operación / política.** Un `GRANT` y una política son
+controles distintos: los dos deben permitir la operación. Cada celda de la
+tabla es lo que está en `servidor/ensayos_b3/ddl_minimo.sql` y se ejecuta.
+
+| Tabla | `lumin_app` GRANT | `lumin_app` política | `lumin_espejo` | `lumin_migracion` |
+|---|---|---|---|---|
+| Datos de negocio (`sucursal`, `pantalla`, `contenido`, `programacion`, `lista`, `lista_elemento`, `ajustes_sucursal`, `comando_pantalla`, `turno_vigente`, `descarga_diaria`, `trabajo`) | `SELECT, INSERT, UPDATE, DELETE` | `FOR ALL USING (empresa_id = gc('empresa_id')) WITH CHECK (igual)` | `SELECT`, `USING (true)` | todo, exento |
+| `pantalla`, además | — | `FOR SELECT/UPDATE USING (id_dispositivo = gc('id_dispositivo'))` para el latido sin sesión | ídem | ídem |
+| `empresa` | `SELECT` | `USING (id = gc('empresa_id') OR id IN (SELECT empresa_id FROM membresia WHERE usuario_id = gc('usuario_id')))` | `SELECT`, `USING (true)` | todo |
+| `membresia`, `membresia_sucursal` | `SELECT` (escritura en B4) | `USING (empresa_id = gc('empresa_id') OR usuario_id = gc('usuario_id'))` — la segunda rama permite resolver "mis empresas" antes de conocer la empresa | `SELECT`, `USING (true)` | todo |
+| `usuario` | `SELECT` (`UPDATE` de `contrasena_*` en B4) | `USING (id = gc('usuario_id') OR (gc('fase') = 'login' AND nombre_usuario = gc('nombre_usuario')))` | `SELECT`, `USING (true)` | todo |
+| `sesion` | `SELECT, INSERT, UPDATE` | `USING (token_hash = gc('token_hash') OR usuario_id = gc('usuario_id'))` **y** `WITH CHECK (token_hash = gc('token_hash') OR usuario_id = gc('usuario_id'))` — la rama del token en `WITH CHECK` es la que permite el logout (hallazgo del ensayo) | `SELECT`, `USING (true)` | todo |
+| `auditoria` | **solo `INSERT`** | `FOR INSERT WITH CHECK (empresa_id IS NULL OR empresa_id = gc('empresa_id'))` — `NULL` para los eventos sin empresa (login fallido) | `SELECT`, `USING (true)` | todo |
+| `espejo_marca` | **solo `INSERT`** | `FOR INSERT WITH CHECK (true)` — la marca no lleva datos | `SELECT` `USING (true)` y `UPDATE (procesada_en)` `USING (true) WITH CHECK (true)` | todo |
+| `espejo_estado` | ninguno | ninguna | `SELECT, UPDATE`, `FOR ALL USING (true) WITH CHECK (true)` | todo |
+| `migracion_json` | ninguno | ninguna | `SELECT` | todo |
+
+Notas ensayadas: las columnas `GENERATED … AS IDENTITY` de `auditoria` y
+`espejo_marca` **no** exigen `USAGE` sobre su secuencia para insertar como
+`lumin_app` (PostgreSQL 16.13); si una versión lo exigiera, el DDL añade el
+`GRANT USAGE` y el ensayo lo detecta. `pg_dump -Fc` como `lumin_migracion` y
+`pg_restore` en una base nueva conservan filas de todas las empresas **y** las
+políticas (`pg_policies` viaja con el volcado).
+
+**Arranque de la autenticación con una sesión migrada (`empresa_id NULL`),
+precisión pedida por Codex.** Orden exacto dentro de la transacción de la
+petición: (1) `SET LOCAL lumin.token_hash`; (2) `SELECT usuario_id, empresa_id
+FROM sesion` (la política deja pasar solo esa fila); (3) `SET LOCAL
+lumin.usuario_id`; (4) si `empresa_id` es `NULL` —todas las migradas— se toma
+la **empresa heredada** de §8a (`LUMIN_EMPRESA_HEREDADA=lumin`), no una
+consulta a `membresia`, y se comprueba que el usuario tiene membresía en ella
+(`SELECT 1 FROM membresia WHERE usuario_id = gc('usuario_id') AND empresa_id =
+gc('empresa_id')`, permitido por la política); si no la tiene, 401 y auditoría;
+(5) `SET LOCAL lumin.empresa_id`. Desde B4, `sesion.empresa_id` es obligatoria
+y el paso 4 desaparece. El login por contraseña se ensaya en
+`test_app_sesiones_y_login`: con `fase = 'login'` el nombre resuelve **una**
+fila; sin la fase, el mismo nombre resuelve **cero**.
 
 **Contexto por transacción.** El servidor abre cada transacción con
 `SET LOCAL` (alcance de transacción: se limpia solo al confirmar o abortar, no
@@ -402,28 +470,11 @@ SET LOCAL lumin.token_hash     = '<sha256>'; -- solo durante la resolución de s
 SET LOCAL lumin.id_dispositivo = '<id>';     -- solo para la TV
 ```
 
-**Políticas por tabla.** Una función auxiliar `lumin.gc(nombre)` devuelve el
-GUC o `NULL` si no está puesto, para que la comparación con `NULL` sea falsa y
-la ausencia de contexto devuelva cero filas.
-
-| Tabla | Política (`USING` y `WITH CHECK`) |
-|---|---|
-| Todas las de datos (`sucursal`, `pantalla`, `contenido`, `programacion`, `lista`, `lista_elemento`, `ajustes_sucursal`, `comando_pantalla`, `turno_vigente`, `descarga_diaria`, `membresia`, `membresia_sucursal`, `trabajo`) | `empresa_id = lumin.gc('empresa_id')::uuid` |
-| `empresa` | `id = lumin.gc('empresa_id')::uuid` **o** `id IN (SELECT empresa_id FROM membresia WHERE usuario_id = lumin.gc('usuario_id')::uuid)` — lo segundo solo para listar "mis empresas" al entrar |
-| `usuario` | `id = lumin.gc('usuario_id')::uuid` **o** (`lumin.gc('fase') = 'login'` **y** `nombre_usuario = lumin.gc('nombre_usuario')`) — la fase `login` la pone únicamente `autenticar()`, y solo en su transacción |
-| `sesion` | `token_hash = lumin.gc('token_hash')` **o** `usuario_id = lumin.gc('usuario_id')::uuid` (listar y revocar las propias) |
-| `pantalla`, además de la de empresa | `id_dispositivo = lumin.gc('id_dispositivo')` para el latido, que llega sin sesión: la TV solo ve **su** fila |
-| `auditoria`, `migracion_json`, `espejo_marca` | Sin política para `lumin_app`: **solo `INSERT`** por `GRANT`; lectura reservada a `lumin_migracion` hasta que exista el portal del propietario |
-
-**Arranque de la autenticación**, que Codex señaló como el punto donde una
-igualdad mecánica no funciona: la petición llega con una cookie; el servidor
-pone `lumin.token_hash`, lee **una** fila de `sesion` (la política lo permite),
-obtiene `usuario_id` y `empresa_id`, y los pone en el contexto para el resto
-de la transacción. Para el login con contraseña, `autenticar()` pone
-`lumin.fase = 'login'` y `lumin.nombre_usuario`, lee la fila del usuario,
-verifica y **limpia** la fase antes de devolver. Las sesiones migradas con
-`empresa_id NULL` resuelven la empresa por la membresía del usuario (una sola
-en LUMIN); B4 lo hace obligatorio.
+**Función de contexto.** `lumin.gc(nombre)` devuelve el GUC o `NULL` si no
+está puesto (`nullif(current_setting('lumin.'||nombre, true), '')`), para que
+la comparación con `NULL` sea falsa y la ausencia de contexto devuelva cero
+filas. Ensayado: misma conexión, transacción como `A` → como `B` → sin
+contexto: 1 fila, 1 fila distinta, 0 filas.
 
 **Reutilización de conexiones.** Prueba obligatoria: misma conexión,
 transacción como `A` → transacción como `B` → transacción sin contexto: la
@@ -623,8 +674,14 @@ T-0       Ventana nocturna de ~20 min. Las TVs siguen reproduciendo (tienen
   4. Arrancar 6.11 con LUMIN_DATOS=postgresql, LUMIN_ESPEJO_JSON=1 y
      LUMIN_ESCRITURAS_SOLO_DESDE=<IP de Adrián>. Es la apertura controlada:
      solo esa IP puede escribir; las TVs y el POS siguen en solo lectura.
+     La IP que se compara es la del CLIENTE tal como la ve el servidor:
+     si hay proxy delante, la de X-Forwarded-For SOLO si el proxy es el
+     nuestro (lista fija), nunca la cabecera a ciegas. Como el POS y las TVs
+     de una sucursal pueden salir por la misma IP pública que el operador,
+     la ventana de humo se hace desde una red distinta a la de cualquier
+     sucursal (datos móviles o el propio VPS), y se anota cuál.
   5. Humo, desde esa IP y contra el servidor real: playlist de 3 pantallas,
-     un turno de prueba con numero 'PRUEBA-CORTE' (se retira al terminar),
+     un turno de prueba con numero 'QA-CORT' (7 caracteres: respeta el límite de 8 del contrato del POS; se retira al terminar),
      login con un usuario existente, subir y borrar una imagen 'humo.jpg'.
      Cada paso confirma que el espejo quedó al día (§7.4). Lo creado en el
      humo se elimina y queda anotado en el informe.
@@ -645,49 +702,78 @@ operaciones sin atomicidad entre ellas. La revisión cambia el mecanismo.
 **Fuente de verdad: PostgreSQL, siempre.** Los JSON no se escriben desde las
 rutas; se **regeneran** desde la base.
 
-**Protocolo.**
+**Los 13 documentos del espejo, enumerados** (los mismos 13 archivos que lee
+6.10): `sucursales.json`, `ordenes.json`, `listas.json`, `ajustes.json`,
+`duraciones.json`, `tvs.json`, `comandos.json`, `girados.json`, `turnos.json`,
+`programacion.json`, `contadores.json`, `usuarios.json` y `sesiones.json`.
+Los doce primeros se regeneran desde PostgreSQL; `sesiones.json` se regenera
+con la regla de §7.6 (copia congelada ∩ vigentes). `verificar_espejo.py`
+compara los doce con la equivalencia semántica de §11 y el decimotercero con
+esa regla.
+
+**Protocolo (revisión 3; B3-R2-01).**
 
 1. Cada transacción que modifica datos inserta, **en la misma transacción**,
-   una fila en `espejo_marca (id bigserial, confirmada_en timestamptz)`. Si la
-   transacción aborta, no hay marca. Si confirma, la marca es durable.
-2. Un **único hilo espejo** (uno solo: orden total, sin carreras entre hilos
-   HTTP) hace, como mucho cada 2 s: `m = max(espejo_marca.id)`; si
-   `m > ultima_aplicada`, exporta **los 13 documentos completos** desde
-   PostgreSQL (los datos son kilobytes; medido en el ensayo), los escribe con
-   el `escribir_json` atómico de siempre (temporal + `os.replace`, cada
-   archivo entero o nada), y por último escribe `ultima_aplicada = m` en
-   `espejo_estado` (tabla de una fila) **y** en `json-espejo.estado` junto a
-   los JSON.
-3. **Idempotencia por construcción:** el espejo no reproduce operaciones, las
-   ignora; reconstruye el estado completo. Repetir un ciclo es inocuo. Un
-   ciclo interrumpido a medias deja `ultima_aplicada` sin avanzar, así que el
-   siguiente ciclo lo rehace entero. Que una operación toque cinco JSON
-   (renombrar un archivo) o uno, da igual.
-4. **Sincronizado** significa exactamente: `espejo_estado.ultima_aplicada =
-   max(espejo_marca.id)` **y** el archivo `json-espejo.estado` dice lo mismo
-   **y** una comparación semántica (§11) entre la exportación en memoria y los
-   archivos en disco no encuentra diferencias. `verificar_espejo.py` imprime
-   las tres cosas.
-5. **La reversión se bloquea si no está sincronizado.** `revertir.py` pone
-   solo lectura, espera hasta 30 s a que el hilo espejo alcance la última
-   marca, verifica (punto 4) y solo entonces autoriza arrancar 6.10. Si no
-   alcanza (por ejemplo, PostgreSQL caído), **no revierte**: informa qué falta
-   y espera decisión humana. Nunca se arranca 6.10 sobre un espejo dudoso.
-6. **PostgreSQL inaccesible:** las rutas de escritura responden 503 y las de
-   lectura fallan con 503; **no se escribe en ningún lado**, así que no hay
-   divergencia posible. Las TVs siguen con su lista y su cache (B1). La
-   bitácora lo registra y el respaldo nocturno alerta.
+   una fila en `espejo_marca (id identity, creada_en, procesada_en NULL)`. Si
+   la transacción aborta, la fila nunca es visible. Si confirma, la marca y
+   los datos que anuncia se vuelven visibles **juntos**.
+2. Un **único hilo espejo**, con el rol `lumin_espejo`, hace como mucho cada
+   2 s **una transacción `REPEATABLE READ READ ONLY`** (una sola instantánea)
+   en la que lee (a) el conjunto `P` de marcas **pendientes que ve**
+   (`procesada_en IS NULL`) y (b) los doce documentos completos. Como una
+   marca solo es visible si su transacción confirmó, y la instantánea es una,
+   los documentos leídos contienen exactamente lo que anuncian las marcas de
+   `P`, ni más ni menos. **No se usa `max(id)` para nada.** Si `P` está vacío,
+   no hay trabajo (salvo en el arranque, ver 6).
+3. Escribe los 13 archivos con el `escribir_json` atómico de siempre
+   (temporal + `os.replace`, cada archivo entero o nada).
+4. **Solo después** de escribir, en una transacción corta: `UPDATE
+   espejo_marca SET procesada_en = now() WHERE id = ANY(P)` y `UPDATE
+   espejo_estado SET generacion = generacion + 1, exportada_en = now(),
+   marcas_cubiertas = P`. Luego escribe `json-espejo.estado` con la
+   generación.
+5. **Transacción tardía (el contraejemplo de Codex):** A reserva la marca 1 y
+   sigue abierta; B reserva la 2 y confirma; el espejo ve `P = {2}`, exporta
+   lo de B y marca solo la 2; A confirma: ahora la marca 1 es visible y sigue
+   pendiente; el siguiente ciclo ve `P = {1}`, exporta (con A y B) y la
+   marca. Converge sin ninguna escritura nueva. Ensayado con dos conexiones
+   reales y ese orden exacto; el protocolo de la revisión 2 falla en el mismo
+   ensayo (`test_protocolo_viejo_pierde_la_transaccion_tardia`).
+6. **Arranque:** el primer ciclo tras arrancar el servicio exporta **siempre**,
+   haya o no pendientes. Cubre cualquier caída entre los pasos 3 y 4 y el
+   fallo al escribir `json-espejo.estado`.
+7. **Idempotencia por construcción:** el espejo no reproduce operaciones;
+   reconstruye el estado completo. Repetir un ciclo es inocuo.
+8. **Sincronizado** significa exactamente: (i) no hay marcas pendientes
+   visibles, (ii) la comparación semántica (§11) entre la exportación en
+   memoria y los archivos no encuentra diferencias, y (iii)
+   `json-espejo.estado.generacion = espejo_estado.generacion`.
+   `verificar_espejo.py` imprime las tres. Una transacción **abierta** con
+   marca reservada no cuenta como pendiente (no es visible): lo confirmado
+   sí está sincronizado, y en cuanto confirme aparecerá como pendiente.
+9. **La reversión se bloquea si no está sincronizado.** `revertir.py` pone
+   solo lectura (que además impide nuevas marcas), espera hasta 30 s a que el
+   hilo espejo deje `P` vacío, verifica (punto 8) y solo entonces autoriza
+   arrancar 6.10. Si no lo logra (PostgreSQL caído), **no revierte**: informa
+   qué falta y espera decisión humana.
+10. **PostgreSQL inaccesible:** las rutas de escritura responden 503 y las de
+    lectura fallan con 503; **no se escribe en ningún lado**, así que no hay
+    divergencia posible. Las TVs siguen con su lista y su cache (B1).
+11. **Limpieza:** las marcas procesadas se borran a los 7 días (tarea nocturna
+    como `lumin_migracion`); la tabla nunca crece sin límite.
 
 **Casos ensayados antes del corte, cada uno con su prueba automatizada:**
 
-| Caída | Qué queda | Cómo se recupera |
-|---|---|---|
-| Antes del `COMMIT` | Nada en PostgreSQL, ninguna marca | Nada que recuperar |
-| Después del `COMMIT`, antes de que el espejo corra | Marca durable, JSON viejo | El espejo la ve al arrancar y regenera |
-| A mitad de la escritura de los 13 archivos | Algunos archivos nuevos, otros viejos; `ultima_aplicada` sin avanzar | Siguiente ciclo regenera los 13 |
-| Disco lleno al escribir un JSON | `os.replace` no ocurre; archivo viejo intacto | Bitácora; el espejo reintenta; reversión bloqueada hasta resolver |
-| Dos rutas escriben a la vez varios JSON | Dos marcas | Un solo ciclo regenera el estado final |
-| Kill −9 del servidor en cualquier punto | Lo de arriba, combinado | Al arrancar, el espejo compara marca y estado y regenera |
+| Caída | Qué queda | Cómo se recupera | Ensayo |
+|---|---|---|---|
+| Antes del `COMMIT` | Nada en PostgreSQL, ninguna marca visible | Nada que recuperar | `test_marca_de_transaccion_abortada_no_queda_pendiente` |
+| Después del `COMMIT`, antes de que el espejo corra | Marca pendiente, JSON viejo | El siguiente ciclo la ve y regenera | `test_protocolo_nuevo_converge_con_el_mismo_orden` |
+| Transacción confirmada **después** de un ciclo que ya procesó una marca mayor | Marca menor pendiente y visible | El siguiente ciclo la procesa; no depende de `max(id)` | ídem (contraejemplo de Codex) |
+| A mitad de la escritura de los 13 archivos | Algunos archivos nuevos, otros viejos; marcas sin procesar | Siguiente ciclo regenera los 13 | `test_caida_a_mitad_de_los_archivos` |
+| Tras escribir los 13 y antes de marcar | Archivos al día, marcas pendientes | Siguiente ciclo rehace y marca (idempotente) | `test_caida_tras_escribir_y_antes_de_marcar` |
+| Base marcada y `json-espejo.estado` sin escribir | Generación en disco atrasada | `sincronizado` = no (reversión bloqueada); al reiniciar, el arranque exporta y coincide | `test_fallo_al_persistir_el_marcador_en_disco` |
+| Disco lleno al escribir un JSON | `os.replace` no ocurre; archivo viejo intacto; marcas pendientes | Bitácora; el espejo reintenta; reversión bloqueada hasta resolver | (prueba de la implementación) |
+| Kill −9 del servidor en cualquier punto | Lo de arriba, combinado | Arranque: exporta siempre una vez | regla 6 |
 
 **Después de apagar el espejo (día 7+).** `exportar_json.py` es el mismo
 exportador del hilo espejo, ejecutado a mano en solo lectura. Misma
@@ -705,9 +791,10 @@ añada B4); las sesiones creadas después del corte (§7.6); y la diferencia
 | Contraseñas `sha256(sal+pwd)` | Se migran tal cual con `algoritmo='sha256-sal'`. **Nadie cambia de contraseña el día del corte** | Bloquear a las recepcionistas la noche del corte es el peor resultado posible |
 | Recifrado | B4: en el siguiente login correcto se verifica con sha256, se recifra con Argon2id y se cambia `algoritmo`. Se registra en auditoría | La transición dura lo que tarde cada persona en volver a entrar |
 | Contraseña fija del código (QA-F03) | **Sigue existiendo en B3** para el bootstrap del `admin`. Se declara. B4 la elimina y obliga a rotar la del `admin` | B3 no toca autenticación por alcance |
-| Sesiones vigentes en el corte | Se migran (`token_hash = sha256(token)`, misma `exp`); **no se revocan**. La cookie de cada quien sigue sirviendo | Cero fricción el día del corte |
+| Sesiones vigentes en el corte | Se migran (`token_hash = sha256(token)`, misma `exp`, `empresa_id NULL`); **no se revocan**. La cookie de cada quien sigue sirviendo | Cero fricción el día del corte |
 | Sesiones vencidas | No se migran | Basura |
-| **Sesiones creadas después del corte, si se revierte** (B3-QA-02) | El espejo **no toca `sesiones.json`**: queda congelado con las sesiones del corte, que 6.10 sí sabe leer. Las creadas después existen solo como hash en PostgreSQL y **no pueden** volcarse al formato viejo. **Contrato:** toda reversión conserva las sesiones anteriores al corte y cierra las posteriores; esas personas vuelven a entrar una vez. Se ensaya: login en el día 8, revertir, comprobar que esa cookie ya no sirve y que una del día −1 sí | Es la única opción honesta sin guardar tokens en claro, que no se hace |
+| **`sesiones.json` durante B3 y al revertir** (B3-QA-02, corregido por **B3-R2-02**) | El espejo **regenera** `sesiones.json` en cada ciclo como **copia congelada ∩ vigentes en PostgreSQL**: de la copia del corte (`json-congelados/…/sesiones.json`, que sí tiene los tokens en claro, como hoy) conserva solo los tokens cuyo `sha256` sigue en `sesion` con `revocada_en IS NULL`, `expira_en > now()` y usuario activo; `exp` = el menor de los dos. Un logout o una baja de usuario durante B3 desaparece del archivo en ≤ 2 s. Las sesiones creadas **después** del corte existen solo como hash y **no** se vuelcan: al revertir quedan cerradas y esas personas entran una vez. Cuando la última sesión anterior al corte vence, el archivo regenerado queda vacío y la copia congelada deja de tener valor. **Contrato:** revertir conserva revocaciones, vencimientos y bajas; conserva las sesiones anteriores al corte **solo** si siguen vigentes; cierra las posteriores | Ensayado con el servidor 6.10 real (`test_ensayo_sesiones.py`): reproducción del defecto de la copia congelada y contrato corregido. Sin tokens nuevos en claro en ningún lado |
+| Si PostgreSQL no está disponible al revertir | La reversión ya está bloqueada por §7.4-9. Si Adrián decide forzarla, el último `sesiones.json` regenerado (≤ 2 s de antigüedad) es el que se usa, y queda anotado. **Decisión D7** (§9): si prefiere que toda reversión cierre todas las sesiones (más simple, una molestia única), el espejo escribe `{}` en vez de la intersección | Se declara para que no se asuma |
 | Revocación masiva | **En B4**, cuando entren Argon2id y la sesión por ámbito: ahí se cierra todo y cada quien vuelve a entrar una vez, avisado | Una sola interrupción, cuando trae algo a cambio |
 | Reversión a 6.10 **después de B4** | **No está cubierta por este diseño.** Cuando B4 recifre a Argon2id, 6.10 no podrá verificar esas contraseñas. B4 definirá su propia marcha atrás (conservar el hash sha256 hasta validar B4, o restablecimiento por correo) | Se declara para que nadie lo asuma |
 
@@ -812,13 +899,25 @@ Protocolo, escrito ahora para que B5 no lo improvise:
   `tipo`. Reencolar lo mismo no crea dos trabajos; una versión nueva del mismo
   nombre sí.
 - **Posesión:** al reclamar se genera `posesion = gen_random_uuid()` y se
-  devuelve al trabajador. **Publicar el resultado exige la posesión vigente:**
-  `UPDATE trabajo SET estado='hecho', terminado_en=now() WHERE id=$1 AND
-  posesion=$2 AND estado='en_curso'`; si afecta 0 filas, el trabajador
-  **descarta** su resultado (borra su temporal) porque otro lo reclamó después
-  o fue cancelado. El renombrado del archivo final ocurre **después** de ese
-  `UPDATE` exitoso, nunca antes: un trabajador atrasado no puede pisar un
-  resultado nuevo.
+  devuelve al trabajador. **Publicar el resultado exige la posesión vigente.**
+- **Límites de transacción y publicación (precisión de Codex, para B5):** el
+  resultado se escribe primero en disco con un **nombre por versión**
+  (`<destino>/<nombre>.<digest8>.mp4`, idempotente: escribirlo dos veces da el
+  mismo archivo) y **después** una sola transacción hace `UPDATE trabajo SET
+  estado='hecho', terminado_en=now(), resultado=<ruta versionada> WHERE id=$1
+  AND posesion=$2 AND estado='en_curso'`. Si afecta 0 filas, el trabajador
+  borra su archivo versionado. El "nombre visible" (`<nombre>.mp4` que sirve
+  la URL heredada) no se renombra: `contenido.ruta_almacen` apunta a la ruta
+  versionada y la URL la resuelve. Así no existe el estado "hecho sin archivo":
+  el archivo existe antes del `UPDATE`, y un archivo versionado huérfano (crash
+  entre disco y `UPDATE`) lo recoge el barrido de en_curso y se reescribe
+  idéntico. Un `UPDATE` exitoso no "resuelve" la consistencia con disco: la
+  garantiza el orden archivo → `UPDATE` más nombres por versión.
+- **Digest por destino (precisión de Codex):** `clave_idem = sha256(contenido)
+  + tipo + sucursal_id`. Dos destinos de la misma empresa con el mismo archivo
+  son **dos trabajos** (y dos publicaciones); compartir un artefacto por
+  digest entre destinos queda para B5 como optimización explícita, no como
+  efecto colateral de la deduplicación.
 - **Reintentos:** al fallar, `intentos+1`, `no_antes_de = now() + 2^intentos
   minutos`, `estado='pendiente'`, `posesion=NULL` mientras `intentos <
   max_intentos`; después `fallido` con `error`, visible en el panel (B6).
@@ -857,15 +956,20 @@ python3 /opt/lumin-tv/servidor/herramientas/inventario_decisiones.py /opt/lumin-
 
 (está en `servidor/herramientas/` de la rama; hay que copiarla al VPS). Lee
 `tvs.json`, `sucursales.json` y `usuarios.json`, **no escribe nada**, no
-muestra hashes, sales ni tokens, y recorta los identificadores de pantalla a
-sus últimos 6 caracteres como hace el panel. Imprime:
+muestra hashes, sales ni tokens, y usa como alias el sufijo más corto (mínimo
+6 caracteres) que distingue todos los identificadores, con el mapeo alias →
+id completo al final (INV-01). Si falta un archivo, no se puede leer o no
+tiene el esquema esperado, **no imprime conclusiones** y termina con código 2;
+un archivo válido pero vacío se dice como tal. Ocho pruebas con datos
+sintéticos en `servidor/tests/test_inventario_decisiones.py`. Imprime:
 
 - **D1:** cada número repetido con las pantallas que lo comparten (id parcial,
   sucursal, zona, último contacto, desfase actual, turnos, lista) y el número
   que tomaría cada una con la regla propuesta. Dice explícitamente que
   `tvs.json` **no guarda fecha de alta**, así que "más antigua" no se puede
-  acreditar: la regla propuesta usa el menor `indice` de registro, y la
-  decisión es tuya.
+  acreditar: la regla propuesta conserva el número la primera por `indice`
+  y, a igualdad de índice (lo normal entre duplicadas), la de identificador
+  menor —un orden estable, no antigüedad—, y la decisión es tuya.
 - **D2:** cada usuario cuyo alcance efectivo de hoy no coincide con lo que
   declara (lista vacía → todas; claves inexistentes → la primera), con sus
   sucursales declaradas, las efectivas y el motivo.
@@ -877,6 +981,7 @@ sus últimos 6 caracteres como hace el panel. Imprime:
 | D3 | Row Level Security | Activarla desde el día uno; el costo es mínimo y elimina una clase entera de fugas |
 | D4 | Duración del espejo | 7 días de observación. Aprobarlos no sustituye el protocolo de §7.4 ni sus pruebas |
 | D5 | Ventana del corte | Se acuerda **después** de la implementación, los ensayos y la revisión de Codex. No bloquea nada de este diseño |
+| D7 | Sesiones al revertir (§7.6) | **Propuesta:** el espejo regenera `sesiones.json` como copia congelada ∩ vigentes: quien no cerró sesión sigue dentro; quien la cerró, sigue fuera. Alternativa más simple: toda reversión cierra todas las sesiones y cada quien entra una vez. Las dos conservan revocaciones; la diferencia es solo la molestia |
 | D6 | Copia anonimizada de los JSON reales para el ensayo | Primero entrego `anonimizar_json.py` y la lista exacta de campos que elimina o reemplaza (hashes, sales, tokens, **mensajes del cintillo, turnos, nombres de usuario, zonas y nombres de archivo**, que también pueden revelar cosas); tú revisas la lista, la corres en el VPS y decides si compartes la salida. Ejecutar y transferir datos reales requiere tu autorización expresa; no se ha hecho |
 
 ---
@@ -961,7 +1066,11 @@ respaldo sí, adaptado a `pg_dump` (§7.5).
 
 ## 13. Lo que pido para cerrar la revisión
 
-- Las seis decisiones de §9.
+- Las siete decisiones de §9 (D7 es nueva en esta revisión).
+- Que Codex repita los 21 ensayos de `servidor/ensayos_b3/` en su entorno
+  (necesitan un PostgreSQL 16 de ensayo y `psycopg` 3; el README dice cómo).
+  Son la evidencia de B3-R2-01/02/03; sin repetirlos, cuentan como evidencia
+  aportada por Claude.
 - Objeciones de Codex al esquema (§3), en especial a `descarga_diaria` sin
   FK, a `sesion.empresa_id` nulo en migración, y a la política de §6.2.
 - Confirmación de que el ensayo con copia anonimizada es aceptable dentro de

@@ -193,3 +193,47 @@ antigüedad; funciona, solo cachea menos. Contra 6.10 usa el tamaño real. Ning�
 contrato de `GET` cambia.
 
 Nuevo SHA candidato: el commit de esta revisión (ver `git log -1`).
+
+
+---
+
+## Revisión R4 — respuesta a `15-qa-R3-y-diseno-B3-rev2-78306df.md` (Codex, 2026-09-16)
+
+Los dos hallazgos se **CONFIRMAN**. Y esta vez la evidencia ya no es solo
+lectura: la planificación de `CacheTask.brs` (reintentos, cola, registro,
+cuarentenas) se **ejecuta** fuera del dispositivo con el intérprete
+BrightScript `brs` (`@rokucommunity/brs` 0.47.6) sobre el **código real** del
+componente. Lo que sigue sin poder ejecutarse aquí —transferencia HTTP,
+`cachefs:`, nodo de video, reloj del equipo— sigue en F1–F21.
+
+| ID | Decisión | Qué cambió | Evidencia ejecutada |
+|---|---|---|---|
+| R3-B1-01 [P1] el reintento se descartaba porque la URL seguía "activa" | **CONFIRMADO.** `registrarFallo` → `encolar` corría con `m.activo` aún puesto; `encolar` lo rechazaba; la cola quedaba vacía y el bucle esperaba un mensaje que podía no llegar | El cuerpo del bucle es ahora `procesarSiguiente()`: **cierra `m.activo` antes** de registrar el resultado. La exclusión del activo sigue vigente durante la transferencia | Contra la lógica de `78306df`: `milisegundosHastaElSiguiente = -1` y **1 solo intento en 20 min**. Contra el árbol: 6 intentos exactamente en los segundos **0, 30, 90, 210, 450, 750**, luego `agotado`, sin ningún mensaje `deseados`/`reconectado`; reconciliar en medio de una descarga que falla deja **una** entrada en cola, 1 intento y reintento a 30 s |
+| R3-B1-02 [P2] `sin_espacio` se liberaba en cada reconciliación | **CONFIRMADO.** `aplicarDeseados` reseteaba todos los `sin_espacio` sin comparar la lista | Se rehabilita solo si **cambió el conjunto de URLs** (`conjuntosDistintos`) **o** `desalojarNoDeseados` liberó bytes de verdad (ahora devuelve lo liberado) | Contra `78306df`: 10 reconciliaciones idénticas → **11 intentos**. Contra el árbol: 10 reconciliaciones idénticas en 10 min → **1 intento**; lista con una URL más → reintenta; misma lista pero un archivo ajeno desalojado → reintenta |
+
+**El arnés** (`roku-app/pruebas/`): `planificacion.brs` (10 escenarios, 35
+comprobaciones), `Cache_simulado.brs` (sustituye `Cache.brs` porque `brs` no
+tiene `roEVPDigest`; solo nombres) y `correr.py`. Sustituye únicamente
+`roFileSystem`, `roTimespan` y la transferencia (`m.simulacion`, un asidero que
+en la TV no existe); **no sustituye nada de la lógica** de `CacheTask.brs`.
+Para poder invocarla se extrajeron `configurar()`, `procesarSiguiente()` y
+`reanimarAgotados()` del bucle; el bucle real los llama igual. Resultados:
+
+| Objetivo | Resultado |
+|---|---|
+| `components/CacheTask.brs` del árbol (build 60) | **35 comprobaciones, 0 fallos** |
+| Lógica de `78306df` (copia con solo los asideros del arnés, fuera del repo) | **13 fallos**, exactamente los dos hallazgos: R3-B1-01 (`fue -1`, `fueron 1` intentos) y R3-B1-02 (`fueron 11`) |
+
+Además cubre lo que Codex pidió en R2: 404 sostenido durante 29
+reconciliaciones → 1 intento, a los 30 min uno más; reconciliar no reinicia
+intentos ni fecha; `agotado` no se reanima con la misma lista y sí al
+reconectar; una URL que sale de la lista se borra y se olvida.
+
+Cómo repetirlo: `npm i -g @rokucommunity/brs@0.47.6` y `python3
+roku-app/pruebas/correr.py` (código 0 solo con 0 fallos y sin errores del
+intérprete). BrighterScript sobre el árbol: 0 diagnósticos. `manifest` pasa a
+**build 60**.
+
+**Límite declarado del arnés:** `brs` no es el firmware de Roku. Demuestra la
+planificación (qué se intenta y cuándo), no la reproducción. F1–F21 siguen
+pendientes en la TV de pruebas.

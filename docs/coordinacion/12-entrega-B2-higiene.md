@@ -196,3 +196,19 @@ el contador de reproducciones. Tres pruebas nuevas
 árbol y, con `comparar_con_base.py`, **10 fallan / 3 pasan** contra `ea610d6`
 (las tres de `HEAD` fallan ahí por el 501). Ningún contrato `GET` cambia. B2
 sigue cerrado en cuanto a sus hallazgos; esto es una extensión pedida por B1.
+
+## Nota R4 (2026-09-16): inventario D1/D2 (INV-01)
+
+`servidor/herramientas/inventario_decisiones.py` ya **no** produce un
+inventario vacío exitoso: directorio inexistente, archivo faltante, JSON
+inválido o esquema incorrecto → "INVENTARIO NO GENERADO", sin conclusiones,
+código 2. Un archivo válido pero vacío se informa como "(archivo valido,
+vacio)". Alias de pantalla: sufijo más corto (≥ 6) que distingue todos los
+identificadores, con mapeo alias → id completo al final; la explicación del
+desempate dice lo que hace el código (índice y, a igualdad, identificador
+menor). Ocho pruebas nuevas en `tests/test_inventario_decisiones.py` (dir
+inexistente, archivo faltante, JSON inválido, tres esquemas incorrectos,
+vacío válido, alias con sufijos iguales, D2, sin credenciales y sin
+modificar archivos). Suite del servidor: **21 pasan**. La salida sigue sin
+ser anónima (usuarios, sucursales, zonas): es para que Adrián decida, y no
+se ha ejecutado sobre datos reales.
