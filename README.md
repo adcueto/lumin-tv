@@ -6,9 +6,9 @@ programadas y control remoto desde el celular.
 
 ## Componentes
 - **roku-app/** — App BrightScript/SceneGraph para las TVs Roku
-  (canal "LUMIN Belleza TV" en la tienda). v5.1
+  (canal "LUMIN Belleza TV" en la tienda). v5.2 (5.1 en la flota)
 - **servidor/** — Servidor Python (stdlib) con panel web PWA, API de
-  turnos para el POS, campañas y estadísticas. v6.7. Corre en
+  turnos para el POS, campañas y estadísticas. v6.10. Corre en
   /opt/lumin-tv del VPS (systemd `lumin-tv` + nginx en
   tv.luminbelleza.com).
 - **vigilante/** — Script para Raspberry Pi (uno por sucursal):

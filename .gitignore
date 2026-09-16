@@ -7,3 +7,8 @@ servidor/videos/
 servidor/miniaturas/
 servidor/rapidos/
 servidor/*.json
+
+# pruebas del servidor
+servidor/tests/__pycache__/
+servidor/.venv/
+servidor/registro/

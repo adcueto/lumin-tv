@@ -8,11 +8,17 @@ LUMIN TV 4.0 — señalización digital para Roku
 - Enviar un video o foto a una pantalla específica al momento.
 - Panel responsive (celular, tablet y computadora).
 Las TVs consultan el servidor cada 4 segundos.
+
+v6.10 (B2, higiene): bitacora de errores a archivo, cuatro carreras cerradas,
+cola de conexiones de 5 a 64, los 404 ya no cuentan como reproduccion y las
+pantallas nuevas ya no reutilizan numeros. Sin cambios de contrato.
 """
 
 import base64
 import hashlib
 import json
+import logging
+import logging.handlers
 import os
 import re
 import shutil
@@ -86,6 +92,43 @@ CANDADO = threading.RLock()
 FFMPEG = shutil.which("ffmpeg")
 FFPROBE = shutil.which("ffprobe")
 
+DIR_REGISTRO = os.path.join(BASE, "registro")
+
+
+# ---------------- bitacora de errores ----------------
+# Antes los fallos se tragaban en silencio (except: pass) y no quedaba rastro
+# para diagnosticar. Ahora quedan en registro/lumin.log, con hora de Queretaro
+# y rotacion para que nunca llene el disco del VPS.
+
+class _FormatoLocal(logging.Formatter):
+    def formatTime(self, registro, datefmt=None):
+        t = datetime.fromtimestamp(registro.created, ZoneInfo(ZONA_HORARIA))
+        return t.strftime(datefmt or "%Y-%m-%d %H:%M:%S")
+
+
+def _abrir_bitacora():
+    log = logging.getLogger("lumin." + os.path.basename(BASE))
+    log.setLevel(logging.INFO)
+    log.propagate = False
+    formato = _FormatoLocal("%(asctime)s  %(levelname)-7s  %(message)s")
+    try:
+        os.makedirs(DIR_REGISTRO, exist_ok=True)
+        archivo = logging.handlers.RotatingFileHandler(
+            os.path.join(DIR_REGISTRO, "lumin.log"),
+            maxBytes=2_000_000, backupCount=5, encoding="utf-8")
+        archivo.setFormatter(formato)
+        log.addHandler(archivo)
+    except OSError:
+        pass  # sin permiso de escritura: al menos queda la consola
+    consola = logging.StreamHandler(sys.stderr)
+    consola.setLevel(logging.WARNING)
+    consola.setFormatter(formato)
+    log.addHandler(consola)
+    return log
+
+
+bitacora = _abrir_bitacora()
+
 
 # ---------------- utilidades ----------------
 
@@ -150,28 +193,33 @@ def _hash(contrasena, sal):
 
 
 def usuarios():
-    u = leer_json(ARCHIVO_USUARIOS, {})
-    if not u:
-        # primer arranque: crear el administrador inicial
-        sal = secrets.token_hex(8)
-        u = {"admin": {"sal": sal, "hash": _hash(CONTRASENA_PANEL or "admin", sal),
-                       "rol": "admin", "sucursales": []}}
-        escribir_json(ARCHIVO_USUARIOS, u)
-        print("  Usuario inicial creado: admin (cambia su contraseña pronto)")
-    return u
+    with CANDADO:
+        u = leer_json(ARCHIVO_USUARIOS, {})
+        if not u:
+            # primer arranque: crear el administrador inicial
+            sal = secrets.token_hex(8)
+            u = {"admin": {"sal": sal, "hash": _hash(CONTRASENA_PANEL or "admin", sal),
+                           "rol": "admin", "sucursales": []}}
+            escribir_json(ARCHIVO_USUARIOS, u)
+            bitacora.warning("usuario inicial 'admin' creado; cambiar su contrasena")
+            print("  Usuario inicial creado: admin (cambia su contraseña pronto)")
+        return u
 
 
 def crear_usuario(nombre, contrasena, rol, claves):
-    u = usuarios()
-    nombre = re.sub(r"[^a-zA-Z0-9._\-]", "", nombre.lower())[:30]
-    if not nombre or nombre in u or len(contrasena) < 4:
-        return False
-    sal = secrets.token_hex(8)
-    u[nombre] = {"sal": sal, "hash": _hash(contrasena, sal),
-                 "rol": "admin" if rol == "admin" else "usuario",
-                 "sucursales": [clave_segura(c) for c in claves]}
-    escribir_json(ARCHIVO_USUARIOS, u)
-    return True
+    # Todo el leer-modificar-escribir bajo candado. Antes dos altas a la vez
+    # se pisaban y una de las dos desaparecia sin aviso.
+    with CANDADO:
+        u = usuarios()
+        nombre = re.sub(r"[^a-zA-Z0-9._\-]", "", nombre.lower())[:30]
+        if not nombre or nombre in u or len(contrasena) < 4:
+            return False
+        sal = secrets.token_hex(8)
+        u[nombre] = {"sal": sal, "hash": _hash(contrasena, sal),
+                     "rol": "admin" if rol == "admin" else "usuario",
+                     "sucursales": [clave_segura(c) for c in claves]}
+        escribir_json(ARCHIVO_USUARIOS, u)
+        return True
 
 
 def verificar_credenciales(nombre, contrasena):
@@ -182,13 +230,15 @@ def verificar_credenciales(nombre, contrasena):
 
 
 def crear_sesion(nombre):
-    ses = leer_json(ARCHIVO_SESIONES, {})
-    ahora = int(time.time())
-    ses = {t: s for t, s in ses.items() if s.get("exp", 0) > ahora}
-    token = secrets.token_urlsafe(32)
-    ses[token] = {"usuario": nombre, "exp": ahora + DIAS_SESION * 86400}
-    escribir_json(ARCHIVO_SESIONES, ses)
-    return token
+    # Bajo candado: dos logins simultaneos perdian una de las dos sesiones.
+    with CANDADO:
+        ses = leer_json(ARCHIVO_SESIONES, {})
+        ahora = int(time.time())
+        ses = {t: s for t, s in ses.items() if s.get("exp", 0) > ahora}
+        token = secrets.token_urlsafe(32)
+        ses[token] = {"usuario": nombre, "exp": ahora + DIAS_SESION * 86400}
+        escribir_json(ARCHIVO_SESIONES, ses)
+        return token
 
 
 def usuario_de_token(token):
@@ -206,10 +256,11 @@ def usuario_de_token(token):
 
 
 def cerrar_sesion(token):
-    ses = leer_json(ARCHIVO_SESIONES, {})
-    if token in ses:
-        del ses[token]
-        escribir_json(ARCHIVO_SESIONES, ses)
+    with CANDADO:
+        ses = leer_json(ARCHIVO_SESIONES, {})
+        if token in ses:
+            del ses[token]
+            escribir_json(ARCHIVO_SESIONES, ses)
 
 
 def sucursales_permitidas(u):
@@ -349,9 +400,12 @@ def duracion_de(clave, nombre):
 
 
 def marcar_girado(clave, nombre):
-    g = leer_json(ARCHIVO_GIRADOS, {})
-    g.setdefault(clave, {})[nombre] = True
-    escribir_json(ARCHIVO_GIRADOS, g)
+    # Bajo candado: dos subidas terminando a la vez perdian una marca de giro,
+    # y el video afectado salia de cabeza en la TV.
+    with CANDADO:
+        g = leer_json(ARCHIVO_GIRADOS, {})
+        g.setdefault(clave, {})[nombre] = True
+        escribir_json(ARCHIVO_GIRADOS, g)
 
 
 def esta_girado(clave, nombre):
@@ -425,9 +479,13 @@ def generar_miniatura(clave, nombre):
         cmd += ["-ss", "1"]
     cmd += ["-i", origen, "-frames:v", "1", "-vf", ",".join(filtros), destino]
     try:
-        subprocess.run(cmd, capture_output=True, timeout=120)
-    except subprocess.SubprocessError:
-        pass
+        r = subprocess.run(cmd, capture_output=True, timeout=120)
+        if r.returncode != 0:
+            bitacora.warning("miniatura fallida para %s/%s: %s", clave, nombre,
+                             r.stderr.decode("utf-8", "replace")[-400:])
+    except subprocess.SubprocessError as e:
+        bitacora.error("ffmpeg no pudo generar la miniatura de %s/%s: %s",
+                       clave, nombre, e)
 
 
 # ---------------- pantallas y comandos ----------------
@@ -439,8 +497,13 @@ def registrar_tv(id_tv):
             return 0, SUCURSAL_INICIAL["clave"], False, "000000"
         tvs = leer_json(ARCHIVO_TVS, {})
         if id_tv not in tvs:
-            # pantalla nueva: queda PENDIENTE hasta que un admin la apruebe
-            tvs[id_tv] = {"indice": len(tvs), "sucursal": "", "zona": "",
+            # pantalla nueva: queda PENDIENTE hasta que un admin la apruebe.
+            # El numero es el siguiente al mayor en uso, NO la cantidad de
+            # pantallas: con len() dar de baja una intermedia hacia que la
+            # siguiente alta repitiera un numero (los dos "P6" del panel) y
+            # ademas compartiera el desfase de rotacion de la lista.
+            siguiente = max((int(t.get("indice", -1)) for t in tvs.values()), default=-1) + 1
+            tvs[id_tv] = {"indice": siguiente, "sucursal": "", "zona": "",
                           "aprobada": False,
                           "codigo": str(secrets.randbelow(900000) + 100000)}
         t = tvs[id_tv]
@@ -775,12 +838,17 @@ class Manejador(BaseHTTPRequestHandler):
         if ruta.path.startswith("/videos/"):
             partes = ruta.path[len("/videos/"):].split("/", 1)
             if len(partes) == 2:
+                clave_v = clave_segura(partes[0])
+                nombre_v = nombre_seguro(urllib.parse.unquote(partes[1]))
                 rango = self.headers.get("Range", "")
-                if rango == "" or rango.startswith("bytes=0-"):
-                    contar_reproduccion(clave_segura(partes[0]),
-                                        nombre_seguro(urllib.parse.unquote(partes[1])))
-                self._servir_archivo(dir_videos(clave_segura(partes[0])),
-                                     urllib.parse.unquote(partes[1]))
+                # Solo cuenta si el archivo existe: antes un 404 (archivo
+                # borrado, nombre mal escrito) inflaba las reproducciones.
+                # Sigue siendo un conteo de DESCARGAS iniciadas, no de
+                # reproducciones confirmadas: eso llega cuando la TV reporte.
+                if (rango == "" or rango.startswith("bytes=0-")) and \
+                        os.path.isfile(os.path.join(dir_videos(clave_v), nombre_v)):
+                    contar_reproduccion(clave_v, nombre_v)
+                self._servir_archivo(dir_videos(clave_v), nombre_v)
             else:
                 self._responder(404, '{"error":"no existe"}')
             return
@@ -1464,11 +1532,19 @@ class Manejador(BaseHTTPRequestHandler):
 
 
 class ServidorSilencioso(ThreadingHTTPServer):
+    daemon_threads = True
+    # La cola de conexiones venia en 5, el valor por defecto de Python. Con la
+    # flota consultando a la vez, el sistema operativo tiraba conexiones y la
+    # TV o el panel veian "conexion reiniciada". Medido: 120 simultaneas.
+    request_queue_size = 64
+
     def handle_error(self, request, client_address):
         tipo, _, _ = sys.exc_info()
         if tipo in (ConnectionResetError, BrokenPipeError,
                     ConnectionAbortedError, TimeoutError):
             return
+        # antes solo se imprimia y se perdia; ahora queda en la bitacora
+        bitacora.exception("error atendiendo a %s", client_address)
         super().handle_error(request, client_address)
 
 
@@ -2561,7 +2637,8 @@ if __name__ == "__main__":
     migrar()
     ip = ip_local()
     print("=" * 56)
-    print("  LUMIN TV 4.0 — servidor de anuncios")
+    print("  LUMIN TV 6.10 — servidor de anuncios")
+    print(f"  Bitácora:          {os.path.join(DIR_REGISTRO, 'lumin.log')}")
     print(f"  Panel de control:  http://localhost:{PUERTO}")
     print(f"  URL para las TVs:  http://{ip}:{PUERTO}")
     print("  Ctrl+C para detener")
