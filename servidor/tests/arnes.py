@@ -24,7 +24,10 @@ import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
-FUENTE = RAIZ / "servidor_lumin.py"
+# Por defecto se prueba el servidor del arbol de trabajo. Para comparar contra
+# otra version (por ejemplo la base 6.9 en ea610d6) se apunta esta variable a
+# una copia aislada; ver comparar_con_base.py. Nunca se toca el checkout.
+FUENTE = Path(os.environ.get("LUMIN_SERVIDOR_BAJO_PRUEBA", RAIZ / "servidor_lumin.py"))
 
 CONTRASENA_PRUEBAS = "prueba-1234"
 

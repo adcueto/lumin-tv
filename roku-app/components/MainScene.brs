@@ -44,6 +44,9 @@ sub init()
     m.recibioPlaylist = false
     m.urlsEnVideo = []
     m.rutasEnVideo = []
+    m.ultimosDatos = invalid
+    m.ultimaReconciliacion = 0
+    m.cachePedidaEnVivo = false
 
     m.turnoGrp = m.top.findNode("turno")
     m.tPanel = m.top.findNode("tPanel")
@@ -241,13 +244,25 @@ sub onPlaylistJson()
     guardarOrientacion(datos)
 
     videosStr = FormatJson(datos.videos)
-    if videosStr <> m.playlistActual
+    cambioLista = (videosStr <> m.playlistActual)
+    if cambioLista
         m.playlistActual = videosStr
         reconstruirSegmentos(datos)
-        if not desdeCache then pedirCache(datos)
     else if m.enRespaldo and m.segmentos.Count() > 0 and not desdeCache
         ' misma lista, pero volvio el servidor: intentar salir de la lamina ya
         salirDeRespaldoEIntentar()
+    end if
+
+    ' Reconciliar la cache con la lista deseada (B1-QA-02). No en cada latido:
+    ' cuando cambia la lista, en la primera respuesta en vivo tras arrancar
+    ' desde cache, y como maximo una vez por minuto. CacheTask solo descarga
+    ' lo que falte, asi que reconciliar es barato.
+    if not desdeCache
+        m.ultimosDatos = datos
+        ahora = ahoraSegundos()
+        if cambioLista or not m.cachePedidaEnVivo or (ahora - m.ultimaReconciliacion) >= 60
+            pedirCache(datos)
+        end if
     end if
 
     ' Una lista servida desde la copia local no trae eventos nuevos:
@@ -454,6 +469,8 @@ end sub
 ' ---------- B1: cache local ----------
 
 sub pedirCache(datos as object)
+    m.cachePedidaEnVivo = true
+    m.ultimaReconciliacion = ahoraSegundos()
     lista = []
     for each v in datos.videos
         if v.url <> invalid and v.url <> ""
@@ -611,6 +628,8 @@ sub onConectado()
         ' lo que fallo sin red no era culpa del archivo: limpiar apartados
         m.bloqueadasHasta = {}
         m.fallosPorUrl = {}
+        ' y rellenar la cache con lo que no alcanzo a bajar durante la caida
+        if m.ultimosDatos <> invalid then pedirCache(m.ultimosDatos)
         if m.enRespaldo and m.segmentos.Count() > 0
             salirDeRespaldoEIntentar()
         else
@@ -629,19 +648,20 @@ sub manejarComando(datos as object)
         m.ultimoComando = c.n
         return
     end if
-    if c.n = m.ultimoComando then return
-
     if m.revisarComandoViejo
-        ' Primer comando NUEVO tras una desconexion: se emitio mientras la TV
-        ' no escuchaba. Un "reproducir ahora" atrasado sorprenderia a la
-        ' clienta; se descarta. Pausa/silencio describen un estado deseado y
-        ' si se aplican.
+        ' Primera respuesta tras una desconexion (B1-QA-03): la revision se
+        ' consume AQUI, haya o no comando nuevo. Solo si el comando cambio
+        ' durante la caida y es un "reproducir ahora", se descarta: llegaria
+        ' tarde y sorprenderia a la clienta. Pausa/silencio describen un
+        ' estado deseado y si se aplican. Un comando emitido DESPUES de
+        ' reconectar ya no pasa por aqui y se ejecuta normal.
         m.revisarComandoViejo = false
-        if c.accion = "reproducir"
+        if c.n <> m.ultimoComando and c.accion = "reproducir"
             m.ultimoComando = c.n
             return
         end if
     end if
+    if c.n = m.ultimoComando then return
     m.ultimoComando = c.n
 
     if c.accion = "pausa"

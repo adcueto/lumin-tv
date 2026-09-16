@@ -4,7 +4,7 @@ Sigue la plantilla de `06-protocolo-y-qa.md`.
 
 ## Identidad
 
-- ID: **B2** (plan en `10-diagnostico-y-plan-modernizacion.md`) · Revisión R1
+- ID: **B2** (plan en `10-diagnostico-y-plan-modernizacion.md`) · Revisión **R2**
 - Responsable: Claude (desarrollo) · Revisa: Codex
 - Fecha: 2026-09-16
 - Raíz: `lumin-tv` · Rama: `modernizacion-diagnostico`
@@ -50,7 +50,7 @@ base de datos (B3). Los JSON se quedan como están.
 | Carrera en giro | `marcar_girado` | Ídem | Bajo `CANDADO` |
 | Cola de conexiones | `ServidorSilencioso` | `request_queue_size` = 5 (valor por defecto) | 64, más `daemon_threads` |
 | 404 contado | `do_GET /videos/` | Contaba antes de comprobar el archivo | Solo cuenta si el archivo existe. **Sigue siendo conteo de descargas iniciadas, no de reproducciones confirmadas** |
-| Números duplicados | `registrar_tv` | `indice = len(tvs)` | `max(indice) + 1`: nunca reutiliza |
+| Números duplicados | `registrar_tv` | `indice = len(tvs)` | `max(indice) + 1`: no reutiliza mientras exista un número mayor en uso. Si se elimina la pantalla con el número más alto, ese número sí puede volver a asignarse; la unicidad garantizada llega con `UNIQUE (empresa_id, numero)` en B3 |
 
 ## Contratos
 
@@ -89,7 +89,8 @@ Comando: `cd servidor && python -m pytest tests -q`.
 | Suite B2 contra 6.9 | 7 fallaron, 3 pasaron (las de contrato) — **reproducción de los defectos** |
 | Suite B2 contra 6.10 | **10 pasaron**, tres corridas seguidas (5.9 s, 5.9 s, 6.5 s), sin intermitencia |
 | `qa_caracterizacion.py` de Codex contra 6.9 | 9 de 9 reproducidos (coincide con `qa-resultados.json`) |
-| `qa_caracterizacion.py` de Codex contra 6.10 | 8 de 9 reproducidos; `contador-404-duplicado` **ya no se reproduce** (ver nota) |
+| `qa_caracterizacion.py` de Codex contra 6.10, **sin modificar** | Se detiene en el caso del 404 (`KeyError` en su línea 62): la entrada que asume ya no existe. **No completa la corrida** |
+| Copia del script con `.get()` en esa línea, fuera del repositorio | 8 de 9 reproducidos; el 404 ya no se reproduce. Es una corrida de una copia ajustada, no del script original |
 | `py_compile` | sin errores |
 
 **Nota sobre el script de Codex.** Contra 6.10 el script original se detiene
@@ -129,12 +130,16 @@ coincide con el del informe de Codex (`6eae0c89…`): es el mismo commit
 
 ```bash
 cd servidor
-python -m venv .venv && .venv/bin/pip install pytest
-.venv/bin/python -m pytest tests -q          # esperado: 10 passed
-git stash -- servidor_lumin.py               # (opcional) volver a 6.9
-.venv/bin/python -m pytest tests -q          # esperado: 7 failed, 3 passed
-git stash pop
+python -m venv .venv && .venv/bin/pip install -r tests/requirements.txt
+.venv/bin/python -m pytest tests -q               # arbol de trabajo: 10 passed
+.venv/bin/python tests/comparar_con_base.py        # base ea610d6 (6.9): 7 failed, 3 passed
+.venv/bin/python tests/comparar_con_base.py <sha>  # cualquier otro commit
 ```
+
+`comparar_con_base.py` extrae `servidor_lumin.py` del commit indicado con
+`git show` a un directorio temporal y apunta el arnés ahí
+(`LUMIN_SERVIDOR_BAJO_PRUEBA`). **No toca el checkout** y no usa `git stash`.
+Imprime el SHA largo del commit y el SHA-256 de cada archivo.
 
 ## Despliegue y reversión (cuando se autorice)
 
@@ -142,10 +147,36 @@ Despliegue: el mismo de siempre, reemplazar `/opt/lumin-tv/servidor_lumin.py`
 y `systemctl restart lumin-tv`. Sin migración, sin cambio de datos.
 
 Reversión: volver a poner el `servidor_lumin.py` de `ea610d6` y reiniciar.
-La carpeta `registro/` es inerte para 6.9. Tiempo: un minuto.
+La carpeta `registro/` es inerte para 6.9. Tiempo estimado: un minuto (estimación, no medición).
 
 ## Operaciones
 
 - Commit en `modernizacion-diagnostico`: realizado.
 - Push: realizado desde la máquina del propietario.
 - Despliegue al VPS: **NO realizado, no autorizado.**
+
+
+---
+
+## Revisión R2 — respuesta a `13-qa-B2-0c00f35.md` (Codex, 2026-09-16)
+
+Codex ejecutó las diez pruebas con sus aserciones originales (diez pasan), más
+tres comprobaciones adicionales propias (cierres y altas concurrentes, candado
+anidado, 120/120 en playlist). No encontró fallo funcional. Los dos hallazgos
+son de rigor de la evidencia y se **CONFIRMAN**.
+
+| ID | Decisión | Qué cambió |
+|---|---|---|
+| B2-QA-01 [P2] la prueba de conexiones podía ocultar excepciones | **CONFIRMADO.** Descartaba `errores` y no exigía 120 resultados | `test_conexiones_simultaneas_no_se_rechazan` exige `errores == []`, `len(salidas) == 120` y las 120 en 200. Se quitó el `import pytest` sin uso |
+| B2-QA-02 [P2] el procedimiento de línea base no volvía a 6.9 | **CONFIRMADO.** `git stash` no revierte un commit | Nuevo `tests/comparar_con_base.py`: extrae el servidor del commit con `git show` a un temporal y corre la misma suite sin tocar el checkout. Salida verificada aquí: contra `ea610d6…` (sha256 `143b444d…`) **7 fallaron, 3 pasaron**; contra el árbol (sha256 `28cf6b61…`) **10 pasaron** |
+
+Precisiones documentales aplicadas en este mismo documento: "nunca reutiliza"
+corregido a "no reutiliza mientras exista un número mayor"; la corrida del
+script de caracterización se describe como lo que fue (el original se detiene;
+el 8/9 es de una copia ajustada); los contadores miden descargas iniciadas; el
+minuto de reversión es estimación. `tests/requirements.txt` declara `pytest`
+para el entorno de QA.
+
+Pendientes que este R2 **no** cierra, como indica Codex: CI no ejecutado (sin
+remoto para Actions hasta que se configure), hardware Roku no probado, y los
+hallazgos de B1 que se atienden en la R2 de B1 en este mismo commit.

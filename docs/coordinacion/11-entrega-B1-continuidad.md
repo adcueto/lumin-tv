@@ -4,7 +4,7 @@ Sigue la plantilla de `06-protocolo-y-qa.md`.
 
 ## Identidad
 
-- ID: **B1** (plan en `10-diagnostico-y-plan-modernizacion.md`) · Revisión R1
+- ID: **B1** (plan en `10-diagnostico-y-plan-modernizacion.md`) · Revisión **R2**
 - Responsable: Claude (desarrollo) · Revisa: Codex · Valida en TV: Adrián
 - Fecha: 2026-09-15
 - Raíz: `lumin-tv` · Rama: `modernizacion-diagnostico`
@@ -38,7 +38,7 @@ qué reprodujo.
 | `roku-app/components/MainScene.xml` | Grupo `capaEstado` con `respaldo`, `detalle`, `indicador`; incluye `Cache.brs` |
 | `roku-app/images/respaldo_vertical.png`, `respaldo_horizontal.png` | **Nuevos.** Lámina aprobada por el propietario (`b1-propuesta-visual.png`) |
 | `roku-app/images/punto_ambar.png` | **Nuevo.** Indicador de 24 px |
-| `roku-app/manifest` | 5.1 build 56 → **5.2 build 57** |
+| `roku-app/manifest` | 5.1 build 56 → **5.2 build 58** (R1 fue build 57) |
 | `docs/reproductor-continuidad.md` | **Nuevo.** Comportamiento por escenario, parámetros y las 13 pruebas físicas |
 
 ## Contratos
@@ -124,3 +124,35 @@ dos claves nuevas del registro son inertes para 5.1.
   conversación ("usar el repositorio").
 - Despliegue a la flota, a la tienda de Roku o al VPS: **NO realizado, no
   autorizado.**
+
+
+---
+
+## Revisión R2 — respuesta a `12-qa-B1-ceadf1d.md` (Codex, 2026-09-16)
+
+Los tres hallazgos son **CONFIRMADOS**. Eran fallos de lógica que el compilador
+no podía ver y que Codex encontró por lectura del flujo. Siguen siendo, como
+dice su informe, hallazgos estáticos: la validación física continúa pendiente,
+y para cada corrección se añade una prueba física (F14–F17).
+
+| ID | Decisión | Qué cambió | Dónde |
+|---|---|---|---|
+| B1-QA-01 [P1] presupuesto de cache no aplicado a descargas nuevas | **CONFIRMADO.** El desalojo solo corría al recibir la lista; cuatro archivos de 70 MB pasaban el tope individual y sumaban 280 MB | `descargar` pide el tamaño por `HEAD` **antes** de bajar; si no cabe, desaloja hasta hacer sitio y si aun así no cabe devuelve `sin_espacio`; **durante** la transferencia vigila el temporal cada 2 s contra el tope por archivo y el presupuesto restante y cancela si se rebasa; al confirmar, `revalidarTotal`. Los temporales cuentan en el total. Margen de 20 MB reservado para la reproducción | `CacheTask.brs`: `descargar`, `tamanoRemoto`, `revalidarTotal`, `listarCache` |
+| B1-QA-02 [P1] sin reposición tras fallo con lista estable | **CONFIRMADO.** Un fallo salía de la cola sin volver; la escena solo pedía cache al cambiar la lista; al arrancar desde cache, la primera lista en vivo idéntica no programaba nada | Cola con `intentos` y `noAntesDe`: reintento a 30/60/120/240/300 s, máximo 5; 404/403/"demasiado grande" no se reintentan. La escena reconcilia al cambiar la lista, **al reconectar**, en la **primera lista en vivo tras arrancar desde cache**, y como máximo cada 60 s; nunca en cada latido. Una lista nueva cancela la descarga en curso si ese archivo ya no está en ella | `CacheTask.brs`: `aplicarDeseados`, `siguienteListo`, `esperaReintento`; `MainScene.brs`: `onPlaylistJson`, `onConectado`, `pedirCache` |
+| B1-QA-03 [P2] se descartaba un "Mostrar ahora" válido tras reconectar | **CONFIRMADO.** La comprobación se hacía sobre el primer comando *nuevo*, no sobre la primera *respuesta*; si al reconectar llegaba el mismo `n`, el indicador quedaba armado y descartaba el siguiente comando legítimo | La revisión se consume en la primera respuesta tras reconectar, haya cambiado o no el comando; solo se descarta si `n` cambió durante la caída **y** es `reproducir`. Un comando emitido después ya no pasa por ahí | `MainScene.brs`: `manejarComando` |
+
+**Comprobaciones de regresión aportadas (estáticas):** compilación con
+BrighterScript a nivel `info`, 0 diagnósticos, sobre el nuevo árbol. Los
+recorridos que Codex pidió probar quedan como F14 (suma supera el tope), F15
+(archivo individual demasiado grande), F16 (reposición tras fallo con lista
+estable) y F17 (comando posterior a reconexión, junto con F10 que cubre el
+comando durante la caída), en `docs/reproductor-continuidad.md`. **No los puedo
+ejecutar aquí**; son para la TV de pruebas.
+
+**Sobre el estado local ajeno al candidato:** de acuerdo. Los dos iconos
+borrados están en el árbol de trabajo de `main`, no en la rama; el paquete para
+la TV debe armarse desde la rama (`git archive modernizacion-diagnostico
+roku-app`), no desde el directorio de trabajo actual.
+
+Nuevo SHA candidato: el commit de esta revisión (ver `git log -1`). `manifest`
+pasa a build 58 para distinguir el paquete R2 del R1 en la TV.

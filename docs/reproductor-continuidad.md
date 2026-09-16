@@ -1,4 +1,4 @@
-# Reproductor Roku — continuidad y recuperación (app 5.2)
+# Reproductor Roku — continuidad y recuperación (app 5.2 build 58)
 
 Qué hace la app cuando falla la red o un archivo, qué garantiza y qué no.
 Referencia para operación, para QA y para las pruebas en TV física.
@@ -66,7 +66,10 @@ Ningún mensaje técnico en grande. El botón `*` sigue abriendo el diálogo de 
 | Reintentos desde la lámina | 10, 20, 40, 60 s | `MainScene.brs` |
 | Fallas para apartar un archivo | 3, durante 10 min | `MainScene.brs` |
 | Tolerancia de turno vencido | `duracion` + 30 s | `MainScene.brs` |
-| Cache total / por archivo | 250 MB / 80 MB | `CacheTask.brs` |
+| Cache total / margen / por archivo | 250 MB / 20 MB reservados / 80 MB | `CacheTask.brs` |
+| Presupuesto | Se comprueba con HEAD **antes** de bajar y cada 2 s **durante** la descarga; se revalida al confirmar | `CacheTask.brs` |
+| Reintentos de descarga | 30, 60, 120, 240, 300 s; máximo 5; 404/403 y "demasiado grande" no se reintentan | `CacheTask.brs` |
+| Reconciliación de cache | Al cambiar la lista, al reconectar, en la primera lista en vivo tras arrancar desde cache, y como máximo cada 60 s | `MainScene.brs` |
 | Descarga colgada | < 8 KB/s durante 20 s | `CacheTask.brs` |
 | Arranque sin lista | lámina a los 15 s; lista guardada a los 12 s | ambos |
 
@@ -106,6 +109,10 @@ cortar la corriente de la TV**.
 | F10 | Comando viejo | Cortar el WAN, pulsar "Mostrar al cliente" en el panel, reconectar | La foto **no** se muestra. Luego, con red, pulsar de nuevo: sí se muestra |
 | F11 | Pausa durante la caída | Cortar el WAN, pulsar "Pausa" en el panel, reconectar | La TV se pausa al reconectar |
 | F12 | Video desde cache | Con cache poblada y red presente, mirar en el log del dispositivo (`telnet IP 8085`) si las URLs reproducidas empiezan por `cachefs:/` | Si reproduce desde cache: anotar modelo. Si falla dos veces y pasa a red: anotar modelo también; la app se auto-protege, pero conviene saber en qué equipos no sirve |
+| F14 | Presupuesto de cache (B1-QA-01) | Lista con 4 videos de ~70 MB cada uno (suma 280 MB > 250 MB) | Nunca hay más de ~230 MB en `cachefs:` (250 − margen). Alguno queda sin cachear y se reproduce por red; no hay desalojo por el sistema ni cierre de la app |
+| F15 | Archivo individual demasiado grande | Un video de 100 MB en la lista | No se descarga (HEAD lo descarta); se reproduce por red; el resto de la lista sí se cachea |
+| F16 | Reposición tras fallo (B1-QA-02) | Cortar el WAN justo al asignar una lista nueva; esperar 1 min; reconectar; **no** tocar la lista | En los 5 min siguientes la cache se llena sola (verificar con `telnet IP 8085` los mensajes de descarga). Un segundo corte ya se sobrevive con cache |
+| F17 | Comando posterior a reconexión (B1-QA-03) | Cortar el WAN sin mandar comandos; reconectar; esperar 20 s; pulsar "Mostrar al cliente" | La foto **sí** se muestra (antes se descartaba). Y F10 sigue pasando: un comando emitido *durante* el corte se descarta |
 | F13 | Regresión de lo que ya funcionaba | Cintillo animado y fijo, cambio de velocidad, lista asignada a esa TV, turno normal con próximos y espera, silencio/sonido, "Enviar a…" con foto de 15 s | Todo igual que en 5.1 |
 
 Registrar para cada prueba: modelo de Roku, versión de Roku OS, resultado y,

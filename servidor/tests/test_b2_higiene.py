@@ -11,8 +11,6 @@ import socket
 import threading
 import time
 
-import pytest
-
 from arnes import Servidor
 
 SUC = "plaza-de-la-mujer"
@@ -91,10 +89,14 @@ def test_conexiones_simultaneas_no_se_rechazan():
             except (ConnectionResetError, ConnectionAbortedError, socket.error) as e:
                 return f"error:{type(e).__name__}"
 
-        salidas, _ = _en_paralelo(120, pedir)
-        rechazadas = [x for x in salidas if isinstance(x, str)]
-        assert not rechazadas, f"{len(rechazadas)} conexiones rechazadas: {rechazadas[:3]}"
-        assert all(x == 200 for x in salidas)
+        salidas, errores = _en_paralelo(120, pedir)
+        # B2-QA-01: una excepcion que escape del trabajador no puede ocultar un
+        # resultado faltante. Se exige: cero errores, exactamente 120 respuestas
+        # y las 120 con HTTP 200.
+        assert not errores, f"excepciones en trabajadores: {errores[:3]}"
+        assert len(salidas) == 120, f"faltan respuestas: {len(salidas)} de 120"
+        rechazadas = [x for x in salidas if x != 200]
+        assert not rechazadas, f"{len(rechazadas)} no fueron 200: {rechazadas[:3]}"
 
 
 # ------------------------------------------------ QA-F04 (parte inmediata)

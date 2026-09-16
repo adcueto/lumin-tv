@@ -6,26 +6,32 @@
 '     desaloja cuando otra app necesita espacio. Sobrevive a cerrar la app.
 '   - tmp: se borra al cerrar la app. No sirve para esto.
 ' Por eso esta cache NO promete reproducir sin internet tras reiniciar la TV.
-' Lo que si logra: que una caida de red a mitad del dia no deje la pantalla
-' cargando, porque lo que ya se reprodujo una vez esta en cache.
 '
-' Reglas:
-'   - Descarga de una en una, con tasa minima: si la red se cae a media
-'     descarga, la transferencia se cancela sola en vez de colgarse.
-'   - Descarga a un nombre temporal y renombra al final: un archivo que existe
-'     con su nombre definitivo esta COMPLETO. Nunca se reproduce uno a medias.
-'   - Tope total (MB) y tope por archivo. Al pasarse, se desalojan primero los
-'     archivos que ya no estan en la lista, luego los mas viejos.
+' Reglas (revisadas tras B1-QA-01 y B1-QA-02):
+'   - PRESUPUESTO ANTES Y DURANTE. Antes de bajar se pregunta el tamano (HEAD);
+'     si no cabe, se desaloja primero; si aun asi no cabe, no se baja. Durante
+'     la descarga se vigila el temporal cada 2 s: si rebasa el tope por archivo
+'     o el presupuesto restante, se cancela. Al confirmar, se revalida el total.
+'   - REINTENTOS ACOTADOS. Una descarga fallida vuelve a la cola con espera
+'     creciente (30 s, 60, 120, 240, 300) hasta 5 intentos. Un archivo que no
+'     existe (404) o no cabe por tamano no se reintenta.
+'   - TRABAJOS OBSOLETOS. Si mientras baja llega una lista nueva y este archivo
+'     ya no esta en ella, se cancela.
+'   - Descarga a nombre temporal y renombra al final: un archivo con nombre
+'     definitivo esta COMPLETO. Nunca se reproduce uno a medias.
+'   - Desalojo: primero lo que ya no esta en la lista, luego lo mas viejo.
 
 sub init()
     m.top.functionName = "ejecutar"
 end sub
 
 sub ejecutar()
-    TOPE_TOTAL_BYTES = 250 * 1024 * 1024   ' 250 MB en RAM compartida: conservador
-    TOPE_ARCHIVO_BYTES = 80 * 1024 * 1024  ' un video de salon rara vez pasa de 30 MB
-    TASA_MINIMA_BPS = 8 * 1024             ' 8 KB/s durante 20 s => descarga colgada
-    PERIODO_TASA_S = 20
+    m.TOPE_TOTAL = 250 * 1024 * 1024      ' 250 MB en RAM compartida: conservador
+    m.MARGEN = 20 * 1024 * 1024           ' reservado para la reproduccion en curso
+    m.TOPE_ARCHIVO = 80 * 1024 * 1024
+    m.TASA_MINIMA_BPS = 8 * 1024          ' 8 KB/s durante 20 s => descarga colgada
+    m.PERIODO_TASA_S = 20
+    m.MAX_INTENTOS = 5
 
     m.fs = CreateObject("roFileSystem")
     m.port = CreateObject("roMessagePort")
@@ -34,55 +40,135 @@ sub ejecutar()
     limpiarTemporales()
     m.top.bytesEnCache = bytesEnCache()
 
-    cola = []
-    urlsDeseadas = {}
+    m.cola = []            ' [{url, intentos, noAntesDe}]
+    m.deseadas = {}        ' url -> true
 
     while true
-        ' Si no hay nada que bajar, dormir hasta que la escena mande otra lista
-        if cola.Count() = 0
+        ' ---- esperar: sin trabajo, hasta que llegue algo; con trabajo diferido,
+        '      hasta que le toque; con trabajo listo, seguir de inmediato ----
+        espera = milisegundosHastaElSiguiente()
+        if espera < 0
             msg = wait(0, m.port)
+        else if espera > 0
+            msg = wait(espera, m.port)
         else
-            msg = wait(50, m.port)
+            msg = m.port.GetMessage()
         end if
-
         if type(msg) = "roSGNodeEvent" and msg.getField() = "deseados"
-            d = msg.getData()
-            cola = []
-            urlsDeseadas = {}
-            if d <> invalid and d.lista <> invalid
-                for each it in d.lista
-                    if it.url <> invalid and it.url <> ""
-                        urlsDeseadas[it.url] = true
-                        if not m.fs.Exists(rutaDeCache(it.url))
-                            cola.Push(it)
-                        end if
-                    end if
-                end for
-            end if
-            desalojar(urlsDeseadas, TOPE_TOTAL_BYTES)
+            aplicarDeseados(msg.getData())
         end if
 
-        if cola.Count() > 0
-            it = cola.Shift()
+        it = siguienteListo()
+        if it <> invalid
             ruta = rutaDeCache(it.url)
             if m.fs.Exists(ruta)
                 m.top.listo = {url: it.url, ruta: ruta}
             else
-                resultado = descargar(it.url, ruta, TOPE_ARCHIVO_BYTES, TASA_MINIMA_BPS, PERIODO_TASA_S)
+                resultado = descargar(it.url, ruta)
                 if resultado = "ok"
-                    m.top.bytesEnCache = bytesEnCache()
+                    revalidarTotal()
                     m.top.listo = {url: it.url, ruta: ruta}
-                else
-                    m.top.fallo = {url: it.url, motivo: resultado}
+                else if resultado <> "obsoleto"
+                    m.top.fallo = {url: it.url, motivo: resultado, intento: it.intentos + 1}
+                    if esReintentable(resultado) and it.intentos + 1 < m.MAX_INTENTOS
+                        it.intentos = it.intentos + 1
+                        it.noAntesDe = ahoraMs() + esperaReintento(it.intentos)
+                        m.cola.Push(it)
+                    end if
                 end if
             end if
         end if
     end while
 end sub
 
-' ---- descarga ----
+' ---- cola ----
 
-function descargar(url as string, destino as string, topeBytes as integer, tasaMin as integer, periodo as integer) as string
+sub aplicarDeseados(d as object)
+    ' La lista nueva reemplaza la cola. Se conservan los intentos y esperas de
+    ' lo que sigue deseado, para no reiniciar el retroceso a cada latido.
+    previos = {}
+    for each x in m.cola
+        previos[x.url] = x
+    end for
+    m.cola = []
+    m.deseadas = {}
+    if d <> invalid and d.lista <> invalid
+        for each it in d.lista
+            if it.url <> invalid and it.url <> ""
+                m.deseadas[it.url] = true
+                if not m.fs.Exists(rutaDeCache(it.url))
+                    if previos.DoesExist(it.url)
+                        m.cola.Push(previos[it.url])
+                    else
+                        m.cola.Push({url: it.url, intentos: 0, noAntesDe: 0})
+                    end if
+                end if
+            end if
+        end for
+    end if
+    desalojar(m.TOPE_TOTAL)
+end sub
+
+function siguienteListo() as dynamic
+    ahora = ahoraMs()
+    for i = 0 to m.cola.Count() - 1
+        if m.cola[i].noAntesDe <= ahora
+            it = m.cola[i]
+            m.cola.Delete(i)
+            return it
+        end if
+    end for
+    return invalid
+end function
+
+' -1 = nada en cola; 0 = hay algo listo; >0 = ms hasta el mas proximo
+function milisegundosHastaElSiguiente() as integer
+    if m.cola.Count() = 0 then return -1
+    ahora = ahoraMs()
+    minimo = -1
+    for each x in m.cola
+        falta = x.noAntesDe - ahora
+        if falta <= 0 then return 0
+        if minimo < 0 or falta < minimo then minimo = falta
+    end for
+    if minimo > 5000 then minimo = 5000
+    return minimo
+end function
+
+function esReintentable(motivo as string) as boolean
+    if motivo = "demasiado_grande" then return false
+    if motivo = "http_404" or motivo = "http_403" or motivo = "http_410" then return false
+    return true
+end function
+
+function esperaReintento(intento as integer) as integer
+    ' 30 s, 60, 120, 240, tope 300
+    ms = 30000
+    for i = 2 to intento
+        ms = ms * 2
+    end for
+    if ms > 300000 then ms = 300000
+    return ms
+end function
+
+' ---- descarga con presupuesto ----
+
+function descargar(url as string, destino as string) as string
+    ' 1. tamano anunciado, para decidir ANTES de gastar red y RAM
+    tamano = tamanoRemoto(url)
+    if tamano > m.TOPE_ARCHIVO then return "demasiado_grande"
+
+    ' 2. presupuesto: si no cabe, desalojar; si aun asi no cabe, esperar
+    disponible = m.TOPE_TOTAL - m.MARGEN - bytesEnCache()
+    if tamano > 0 and tamano > disponible
+        desalojar(m.TOPE_TOTAL - m.MARGEN - tamano)
+        disponible = m.TOPE_TOTAL - m.MARGEN - bytesEnCache()
+        if tamano > disponible then return "sin_espacio"
+    end if
+    if disponible <= 0 then return "sin_espacio"
+    topeEsteArchivo = m.TOPE_ARCHIVO
+    if disponible < topeEsteArchivo then topeEsteArchivo = disponible
+
     temporal = "cachefs:/tmp_" + huellaDe(url)
     if m.fs.Exists(temporal) then m.fs.Delete(temporal)
 
@@ -90,42 +176,96 @@ function descargar(url as string, destino as string, topeBytes as integer, tasaM
     xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
     xfer.InitClientCertificates()
     xfer.RetainBodyOnError(false)
-    xfer.SetMinimumTransferRate(tasaMin, periodo)
+    xfer.SetMinimumTransferRate(m.TASA_MINIMA_BPS, m.PERIODO_TASA_S)
     xfer.SetUrl(url)
     puerto = CreateObject("roMessagePort")
     xfer.SetMessagePort(puerto)
-
     if not xfer.AsyncGetToFile(temporal) then return "no_inicio"
 
-    ' Tope duro de 10 minutos por archivo, ademas de la tasa minima
-    evento = wait(600000, puerto)
-    if type(evento) <> "roUrlEvent"
-        xfer.AsyncCancel()
-        if m.fs.Exists(temporal) then m.fs.Delete(temporal)
-        return "tiempo_agotado"
-    end if
+    ' 3. vigilar DURANTE la transferencia, cada 2 s, hasta 10 min
+    inicio = ahoraMs()
+    while true
+        evento = wait(2000, puerto)
+        if type(evento) = "roUrlEvent"
+            exit while
+        end if
+        ' a) tope de tiempo
+        if ahoraMs() - inicio > 600000
+            xfer.AsyncCancel()
+            borrarSiExiste(temporal)
+            return "tiempo_agotado"
+        end if
+        ' b) presupuesto: el temporal no puede rebasar su tope
+        st = m.fs.Stat(temporal)
+        if st <> invalid and st.size <> invalid and st.size > topeEsteArchivo
+            xfer.AsyncCancel()
+            borrarSiExiste(temporal)
+            if st.size > m.TOPE_ARCHIVO then return "demasiado_grande"
+            return "sin_espacio"
+        end if
+        ' c) trabajo obsoleto: llego una lista nueva y este archivo ya no esta
+        msg = m.port.GetMessage()
+        if type(msg) = "roSGNodeEvent" and msg.getField() = "deseados"
+            aplicarDeseados(msg.getData())
+            if not m.deseadas.DoesExist(url)
+                xfer.AsyncCancel()
+                borrarSiExiste(temporal)
+                return "obsoleto"
+            end if
+        end if
+    end while
+
     if evento.GetResponseCode() <> 200
-        if m.fs.Exists(temporal) then m.fs.Delete(temporal)
+        borrarSiExiste(temporal)
         return "http_" + evento.GetResponseCode().toStr()
     end if
-
     st = m.fs.Stat(temporal)
     if st = invalid or st.size = invalid or st.size <= 0
-        if m.fs.Exists(temporal) then m.fs.Delete(temporal)
+        borrarSiExiste(temporal)
         return "vacio"
     end if
-    if st.size > topeBytes
+    if st.size > topeEsteArchivo
         m.fs.Delete(temporal)
-        return "demasiado_grande"
+        if st.size > m.TOPE_ARCHIVO then return "demasiado_grande"
+        return "sin_espacio"
     end if
 
-    ' renombrar al final: si existe con nombre definitivo, esta completo
+    ' 4. renombrar al final: si existe con nombre definitivo, esta completo
     if not m.fs.Rename(temporal, destino)
-        if m.fs.Exists(temporal) then m.fs.Delete(temporal)
+        borrarSiExiste(temporal)
         return "no_renombro"
     end if
     return "ok"
 end function
+
+' Content-Length por HEAD, con tope de 8 s. 0 = desconocido.
+function tamanoRemoto(url as string) as integer
+    xfer = CreateObject("roUrlTransfer")
+    xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
+    xfer.InitClientCertificates()
+    xfer.SetUrl(url)
+    puerto = CreateObject("roMessagePort")
+    xfer.SetMessagePort(puerto)
+    if not xfer.AsyncHead() then return 0
+    evento = wait(8000, puerto)
+    if type(evento) <> "roUrlEvent"
+        xfer.AsyncCancel()
+        return 0
+    end if
+    if evento.GetResponseCode() <> 200 then return 0
+    cab = evento.GetResponseHeaders()
+    if cab = invalid then return 0
+    largo = cab["content-length"]
+    if largo = invalid then largo = cab["Content-Length"]
+    if largo = invalid then return 0
+    n = largo.ToInt()
+    if n < 0 then return 0
+    return n
+end function
+
+sub borrarSiExiste(ruta as string)
+    if m.fs.Exists(ruta) then m.fs.Delete(ruta)
+end sub
 
 ' ---- espacio ----
 
@@ -134,7 +274,8 @@ function listarCache() as object
     lista = m.fs.GetDirectoryListing("cachefs:/")
     if lista = invalid then return salida
     for each nombre in lista
-        if Left(nombre, 6) = "lumin_"
+        ' se cuentan tambien los temporales: ocupan RAM igual
+        if Left(nombre, 6) = "lumin_" or Left(nombre, 4) = "tmp_"
             st = m.fs.Stat("cachefs:/" + nombre)
             tam = 0
             mt = 0
@@ -142,7 +283,8 @@ function listarCache() as object
                 if st.size <> invalid then tam = st.size
                 if st.mtime <> invalid then mt = st.mtime.AsSeconds()
             end if
-            salida.Push({ruta: "cachefs:/" + nombre, bytes: tam, mtime: mt})
+            salida.Push({ruta: "cachefs:/" + nombre, bytes: tam, mtime: mt,
+                         temporal: (Left(nombre, 4) = "tmp_")})
         end if
     end for
     return salida
@@ -153,35 +295,50 @@ function bytesEnCache() as integer
     for each a in listarCache()
         total = total + a.bytes
     end for
+    m.top.bytesEnCache = total
     return total
 end function
 
-sub desalojar(deseadas as object, topeTotal as integer)
+sub revalidarTotal()
+    ' tras confirmar un archivo: si por lo que sea se rebaso, corregir ya
+    if bytesEnCache() > m.TOPE_TOTAL then desalojar(m.TOPE_TOTAL)
+end sub
+
+' Borra hasta que el total quede por debajo de `objetivo`. Protege lo que
+' sigue en la lista mientras haya otra cosa que borrar; nunca borra temporales
+' en curso (no hay: la descarga es de uno en uno y este metodo no corre dentro).
+sub desalojar(objetivo as integer)
     archivos = listarCache()
     total = 0
     for each a in archivos
         total = total + a.bytes
     end for
-    if total <= topeTotal then return
+    if total <= objetivo then return
 
-    ' rutas que SI siguen en la lista: se protegen mientras se pueda
     protegidas = {}
-    for each u in deseadas.Keys()
+    for each u in m.deseadas.Keys()
         protegidas[rutaDeCache(u)] = true
     end for
 
-    ' primero lo que ya no esta en la lista, luego lo mas viejo
+    ' dos grupos ordenados por separado, para que un protegido viejo nunca
+    ' se borre antes que un no protegido reciente
+    libres = []
+    protegidos = []
+    for each a in archivos
+        if a.temporal or not protegidas.DoesExist(a.ruta)
+            libres.Push(a)
+        else
+            protegidos.Push(a)
+        end if
+    end for
+    ordenarPorAntiguedad(libres)
+    ordenarPorAntiguedad(protegidos)
     orden = []
-    for each a in archivos
-        if not protegidas.DoesExist(a.ruta) then orden.Push(a)
-    end for
-    for each a in archivos
-        if protegidas.DoesExist(a.ruta) then orden.Push(a)
-    end for
-    ordenarPorAntiguedad(orden)
+    orden.Append(libres)
+    orden.Append(protegidos)
 
     for each a in orden
-        if total <= topeTotal then exit for
+        if total <= objetivo then exit for
         if m.fs.Delete(a.ruta) then total = total - a.bytes
     end for
     m.top.bytesEnCache = total
@@ -208,3 +365,8 @@ sub limpiarTemporales()
         if Left(nombre, 4) = "tmp_" then m.fs.Delete("cachefs:/" + nombre)
     end for
 end sub
+
+function ahoraMs() as integer
+    if m.reloj = invalid then m.reloj = CreateObject("roTimespan")
+    return m.reloj.TotalMilliseconds()
+end function
