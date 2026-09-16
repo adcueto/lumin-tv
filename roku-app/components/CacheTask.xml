@@ -11,6 +11,9 @@
         <field id="listo" type="assocarray" alwaysNotify="true" />
         <!-- Salida: {url, motivo} cuando una descarga se descarta -->
         <field id="fallo" type="assocarray" alwaysNotify="true" />
+        <!-- Entrada: la escena lo incrementa al recuperar la conexion; los
+             archivos "agotados" por red vuelven a intentarse -->
+        <field id="reconectado" type="integer" value="0" alwaysNotify="true" />
         <!-- Salida: total de bytes actualmente en cache, para diagnostico -->
         <field id="bytesEnCache" type="integer" value="0" />
     </interface>

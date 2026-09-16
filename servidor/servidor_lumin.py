@@ -1037,6 +1037,42 @@ class Manejador(BaseHTTPRequestHandler):
                     return
                 restante -= len(trozo)
 
+    # --- HEAD ---
+    def do_HEAD(self):
+        """HEAD coherente con GET para los medios (R2-B1-01).
+
+        El reproductor pregunta el tamano de un archivo antes de bajarlo a su
+        cache. Antes el servidor respondia 501. Devuelve las mismas cabeceras
+        que GET (Content-Type, Content-Length, Accept-Ranges), sin cuerpo, y
+        NUNCA incrementa contadores: un HEAD no es una descarga.
+        """
+        ruta = urllib.parse.urlparse(self.path)
+        for prefijo, carpeta_de in (("/videos/", dir_videos),
+                                    ("/rapidos/", dir_rapidos),
+                                    ("/miniaturas/", dir_minis)):
+            if ruta.path.startswith(prefijo):
+                partes = ruta.path[len(prefijo):].split("/", 1)
+                if len(partes) != 2:
+                    break
+                nombre = nombre_seguro(urllib.parse.unquote(partes[1]))
+                camino = os.path.join(carpeta_de(clave_segura(partes[0])), nombre)
+                if not os.path.isfile(camino):
+                    self.send_response(404)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                mime = TIPOS_MIME.get(os.path.splitext(nombre)[1].lower(),
+                                      "application/octet-stream")
+                self.send_response(200)
+                self.send_header("Content-Type", mime)
+                self.send_header("Content-Length", str(os.path.getsize(camino)))
+                self.send_header("Accept-Ranges", "bytes")
+                self.end_headers()
+                return
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     # --- POST ---
     def do_POST(self):
         ruta = urllib.parse.urlparse(self.path)

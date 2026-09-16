@@ -180,3 +180,19 @@ para el entorno de QA.
 Pendientes que este R2 **no** cierra, como indica Codex: CI no ejecutado (sin
 remoto para Actions hasta que se configure), hardware Roku no probado, y los
 hallazgos de B1 que se atienden en la R2 de B1 en este mismo commit.
+
+---
+
+## Nota R3 (2026-09-16): `HEAD` para los medios
+
+A raíz de R2-B1-01 (informe 14 de Codex, `HEAD` → 501 reproducido contra un
+servidor candidato aislado), 6.10 incorpora `do_HEAD` para `/videos/`,
+`/rapidos/` y `/miniaturas/`: 200 con `Content-Type`, `Content-Length` y
+`Accept-Ranges`, sin cuerpo; 404 si el archivo no existe; **nunca** incrementa
+el contador de reproducciones. Tres pruebas nuevas
+(`test_head_de_medio_real_responde_como_get_sin_contar`,
+`test_head_de_medio_inexistente_es_404_sin_contar`,
+`test_head_de_miniatura_y_rapido`); la suite queda en **13 pasan** contra el
+árbol y, con `comparar_con_base.py`, **10 fallan / 3 pasan** contra `ea610d6`
+(las tres de `HEAD` fallan ahí por el 501). Ningún contrato `GET` cambia. B2
+sigue cerrado en cuanto a sus hallazgos; esto es una extensión pedida por B1.

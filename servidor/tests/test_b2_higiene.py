@@ -186,3 +186,41 @@ def test_contrato_turno_intacto():
         assert st == 200 and r == {"ok": True}
         t = (s.json("turnos.json") or {})[SUC]
         assert t["numero"] == "L142" and t["n"] == 1 and "ts" in t
+
+
+# ------------------------------------------------ HEAD de medios (R2-B1-01)
+
+def test_head_de_medio_real_responde_como_get_sin_contar():
+    """Codex reprodujo HEAD -> 501. El reproductor lo usa para presupuestar."""
+    with Servidor() as s:
+        s.crear_video(SUC, "cabecera.mp4", bytes_=4096)
+        st, _, _, cuerpo = s.peticion("HEAD", f"/videos/{SUC}/cabecera.mp4")
+        assert st == 200
+        assert cuerpo == b""
+        # mismas cabeceras que GET
+        con = __import__("http.client").client.HTTPConnection("127.0.0.1", s.puerto, timeout=10)
+        con.request("HEAD", f"/videos/{SUC}/cabecera.mp4")
+        r = con.getresponse(); r.read(); con.close()
+        assert r.getheader("Content-Length") == "4096"
+        assert r.getheader("Content-Type") == "video/mp4"
+        assert r.getheader("Accept-Ranges") == "bytes"
+        # y NO cuenta como descarga
+        contadores = (s.json("contadores.json") or {}).get(SUC, {})
+        assert "cabecera.mp4" not in contadores
+
+
+def test_head_de_medio_inexistente_es_404_sin_contar():
+    with Servidor() as s:
+        st, *_ = s.peticion("HEAD", f"/videos/{SUC}/nada.mp4")
+        assert st == 404
+        assert not (s.json("contadores.json") or {}).get(SUC, {})
+
+
+def test_head_de_miniatura_y_rapido():
+    with Servidor() as s:
+        d = s.dir / "miniaturas" / SUC
+        d.mkdir(parents=True)
+        (d / "a.mp4.jpg").write_bytes(b"x" * 10)
+        assert s.peticion("HEAD", f"/miniaturas/{SUC}/a.mp4.jpg")[0] == 200
+        assert s.peticion("HEAD", f"/rapidos/{SUC}/no.jpg")[0] == 404
+        assert s.peticion("HEAD", "/api/yo")[0] == 404

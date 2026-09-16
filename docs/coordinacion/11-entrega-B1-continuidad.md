@@ -156,3 +156,40 @@ roku-app`), no desde el directorio de trabajo actual.
 
 Nuevo SHA candidato: el commit de esta revisión (ver `git log -1`). `manifest`
 pasa a build 58 para distinguir el paquete R2 del R1 en la TV.
+
+
+---
+
+## Revisión R3 — respuesta a `14-qa-R2-y-diseno-B3-5c96845.md` (Codex, 2026-09-16)
+
+Los dos hallazgos abiertos de B1 R2 se **CONFIRMAN**. El primero lo reprodujo
+Codex con una petición real a un servidor candidato aislado (`HEAD` → 501); el
+segundo es de lectura del flujo. El efecto en la cache, en ambos casos, sigue
+siendo análisis estático: no se ha ejecutado en un Roku.
+
+| ID | Decisión | Qué cambió | Dónde |
+|---|---|---|---|
+| R2-B1-01 [P1] tamaño desconocido impide desalojar | **CONFIRMADO.** El servidor no implementaba `do_HEAD` (501, evidencia ejecutada por Codex) y `tamanoRemoto` convertía eso en 0; el único desalojo previo exigía tamaño > 0, así que contra el servidor real nunca se desalojaba antes de bajar | **Servidor 6.10:** `do_HEAD` para `/videos/`, `/rapidos/` y `/miniaturas/`: 200 con `Content-Type`, `Content-Length` y `Accept-Ranges`, sin cuerpo, 404 si no existe, **nunca incrementa el contador**. Tres pruebas nuevas (13 en la suite). **Roku:** si el tamaño es desconocido se reserva el tope por archivo (80 MB) y se desaloja lo más viejo hasta que quepa esa reserva; el desalojo ya no depende de que `HEAD` exista. `sin_espacio` queda como fallo terminal que **solo** se reintenta cuando cambia la lista (el presupuesto pudo cambiar), no en cada ciclo | `servidor_lumin.py`: `do_HEAD`; `test_b2_higiene.py`: `test_head_*`; `CacheTask.brs`: `descargar`, `registrarFallo`, `aplicarDeseados` |
+| R2-B1-02 [P2] la reconciliación perdía el historial y duplicaba el activo | **CONFIRMADO.** El estado vivía en la cola; al reconstruirla, un 404 o un agotado volvían con `intentos = 0`, y la descarga activa, retirada de la cola, se reinsertaba | Registro por URL (`m.registro`) separado de la cola: `intentos`, `noAntesDe`, `terminal`, `motivo`, `hasta`. La cola es solo orden, deduplicada, y excluye a la descarga activa (`m.activo`). Reconciliar reconstruye la cola sin tocar intentos ni esperas y sin insertar el activo; solo borra del registro lo que salió de la lista. Reglas explícitas para volver a intentar un terminal: 404/403/410/"demasiado grande" → cuarentena de 30 min y luego un ciclo nuevo; `sin_espacio` → al cambiar la lista; `agotado` → al reconectar (`reconectado`, contador que la escena incrementa en `onConectado`). Máximo pasa de 5 a **6 intentos**, para que las cinco esperas anunciadas (30/60/120/240/300 s) se cumplan de verdad | `CacheTask.brs`: `entrada`, `encolar`, `aplicarDeseados`, `siguienteListo`, `registrarFallo`, `atenderMensaje`; `CacheTask.xml`: campo `reconectado`; `MainScene.brs`: `onConectado` |
+
+Precisiones que Codex pidió y quedan aplicadas: la espera de 300 s ahora sí se
+alcanza (sexto intento); "404 no se reintenta" se reformula como "404 no se
+reintenta durante 30 minutos ni al reconciliar"; el activo nunca se duplica
+porque `encolar` lo rechaza y `aplicarDeseados` lo salta. Se eliminaron los
+`goto` que quedaban en `CacheTask.brs`.
+
+**Evidencia de esta revisión.** Servidor: suite de 13 pruebas contra el árbol,
+13 pasan (Python 3.11, arnés con servidor real). Roku: compilación con
+BrighterScript a nivel `info`, 0 diagnósticos, sobre el nuevo árbol; `manifest`
+pasa a **build 59**. Los recorridos de aceptación que pide Codex quedan como
+F18 (tamaño desconocido con cache casi llena), F19 (404 sostenido durante
+varias reconciliaciones), F20 (seis intentos con lista estable, esperas
+acumuladas ≈ 12.5 min) y F21 (reconciliación durante una descarga que falla),
+en `docs/reproductor-continuidad.md`. **No los puedo ejecutar aquí.**
+
+**Sobre la convivencia.** Con la app 5.2 build 59 contra el servidor 6.9 (sin
+`HEAD`) el comportamiento es el conservador: reserva de 80 MB y desalojo por
+antigüedad; funciona, solo cachea menos. Contra 6.10 usa el tamaño real. Ningún
+contrato de `GET` cambia.
+
+Nuevo SHA candidato: el commit de esta revisión (ver `git log -1`).

@@ -628,7 +628,10 @@ sub onConectado()
         ' lo que fallo sin red no era culpa del archivo: limpiar apartados
         m.bloqueadasHasta = {}
         m.fallosPorUrl = {}
-        ' y rellenar la cache con lo que no alcanzo a bajar durante la caida
+        ' y rellenar la cache con lo que no alcanzo a bajar durante la caida:
+        ' primero se avisa a la tarea para que libere lo "agotado" por red,
+        ' luego se reconcilia la lista
+        m.cacheTask.reconectado = m.cacheTask.reconectado + 1
         if m.ultimosDatos <> invalid then pedirCache(m.ultimosDatos)
         if m.enRespaldo and m.segmentos.Count() > 0
             salirDeRespaldoEIntentar()
