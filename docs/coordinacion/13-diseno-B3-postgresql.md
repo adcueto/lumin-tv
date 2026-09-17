@@ -1,14 +1,27 @@
-# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 3)
+# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 4)
 
 Para revisión de Adrián y Codex **antes de escribir código**.
-Fecha: 2026-09-16 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 60)
+Fecha: 2026-09-17 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 60)
 
-## Qué cambia en esta revisión 3 (respuesta a `15-qa-R3-y-diseno-B3-rev2-78306df.md`)
+## Qué cambia en esta revisión 4 (respuesta a `19-qa-B1-R4-B3-rev3-ce4716f.md`)
+
+Las cuatro correcciones se **CONFIRMAN**. Los ensayos de `servidor/ensayos_b3/`
+pasan de 21 a **39**; cada corrección tiene el suyo, incluida la reproducción
+del defecto con el protocolo anterior donde aplica.
+
+| Corrección de Codex | Decisión | Dónde | Ensayo |
+|---|---|---|---|
+| B3-R3-01 [P1] el paso 4 filtraba `membresia` por una empresa que aún no estaba en el contexto | **CONFIRMADO.** La empresa heredada se resuelve **por columna** (`empresa.heredada`, visible para `lumin_app` sin contexto por una rama nueva de la política) y la membresía se comprueba **con ese UUID como parámetro**, por la rama `usuario_id` de la política de `membresia`; solo entonces se asigna `lumin.empresa_id`. Sin consulta circular | §3.5 | `resolver_sesion_migrada` en `test_ensayo_rls.py`: migrada con membresía válida → resuelve la heredada; sin membresía → 401; membresía solo en otra empresa → 401; revocada/vencida → 401; sesión nueva con empresa → no toca la heredada; latido sin sesión ve solo la heredada |
+| B3-R3-02 [P1] forzar la reversión con el último `sesiones.json` podía resucitar una revocación posterior | **CONFIRMADO.** La excepción **desaparece**. Toda reversión, incluida la inmediata tras el humo, pasa por el mismo guardián: drenar transacciones en vuelo de `lumin_app`, verificar el estado **final** en PostgreSQL y escribir congelado ∩ vigentes. PostgreSQL inaccesible → **no hay reversión automática**. Única vía de emergencia, con autorización explícita de Adrián: escribir `{}` (todas las sesiones cerradas) declarando que los demás documentos pueden estar desactualizados. Nunca se usa "el último archivo exportado" | §7.3, §7.6 | `test_ensayo_sesiones.py`: reproducción del defecto (revocar tras la última exportación y restaurar ese archivo → cookie aceptada), `revertir` bloquea sin PostgreSQL, emergencia cierra todas, normal usa el estado final, drenaje espera y cancela |
+| B3-R3-03 [P2] dos posesiones compartían el nombre del artefacto; el perdedor borraba el de la ganadora | **CONFIRMADO.** El artefacto lleva la **posesión** en el nombre (`<nombre>.<digest8>.<posesion8>.mp4`); publicar es un solo `UPDATE` condicionado a la posesión que además guarda la ruta; quien pierde borra **solo** lo que lleva su posesión; los huérfanos (sin referencia y sin posesión viva) los recoge un barrido | §8b | `test_ensayo_cola.py`: reproducción del defecto con el nombre compartido ("hecho sin archivo"), A vencido / B publicado / A descartado, caída tras escribir y antes del `UPDATE`, reintento idempotente, cancelación en curso |
+| B3-R3-04 [P2] el guardián no consultaba el propietario; la matriz decía "ensayado" donde solo hay contrato | **CONFIRMADO.** `guardian_de_catalogo` exige propietario `lumin_migracion`, RLS activa, política para todo `GRANT` y roles sin atributos peligrosos, con **dos casos negativos** (tabla creada por `lumin_app`; tabla sin RLS con `GRANT`). La matriz gana una columna **Ensayado / Contrato** y el texto ya no atribuye a los ensayos lo que no ejecutan | §3.5 | `test_guardian_*` (3) |
+
+## Qué cambió en la revisión 3 (respuesta a `15-qa-R3-y-diseno-B3-rev2-78306df.md`)
 
 Las tres objeciones se **CONFIRMAN**. Esta vez cada corrección viene con un
 **ensayo ejecutable** contra PostgreSQL 16 real y datos sintéticos, en
-`servidor/ensayos_b3/` (21 ensayos; se omiten, no pasan, si no hay base de
-ensayo). No es implementación de B3: es el diseño demostrado antes de
+`servidor/ensayos_b3/` (21 ensayos en esta revisión, 39 en la 4; se omiten, no
+pasan, si no hay base de ensayo). No es implementación de B3: es el diseño demostrado antes de
 programarlo.
 
 | Objeción de Codex | Decisión | Dónde | Ensayo |
@@ -417,26 +430,37 @@ y no son miembros de nadie (`SET ROLE` falla, ensayado).
 propietario, y como no habría política para él, migración, verificación y
 respaldo verían **cero filas** (ensayado: `test_por_que_no_force_rls`). La
 protección que buscaba `FORCE` ("si `lumin_app` llegara a ser propietario") se
-obtiene de otra forma: el guardián de catálogo exige que **ninguna** tabla del
-esquema tenga a `lumin_app` o `lumin_espejo` como propietario y que toda tabla
-tenga RLS activa (`test_ninguna_tabla_sin_rls_ni_politica_para_app`).
+obtiene de otra forma: el guardián de catálogo (`guardian_de_catalogo`, con la
+lista de tablas tomada del catálogo) exige que **toda** tabla del esquema tenga
+como propietario a `lumin_migracion`, RLS activa y una política para cada
+`GRANT` a `lumin_app`, y que ningún rol tenga atributos peligrosos. Tiene dos
+casos negativos que lo hacen fallar (una tabla creada por `lumin_app` con RLS y
+política propias; una tabla sin RLS con `GRANT`): rev. 4, B3-R3-04.
 
 **Matriz rol / tabla / operación / política.** Un `GRANT` y una política son
-controles distintos: los dos deben permitir la operación. Cada celda de la
-tabla es lo que está en `servidor/ensayos_b3/ddl_minimo.sql` y se ejecuta.
+controles distintos: los dos deben permitir la operación. La última columna
+dice, tabla por tabla, si la fila está en `servidor/ensayos_b3/ddl_minimo.sql`
+**y se ejecuta** en los 39 ensayos, o si es **contrato** para la
+implementación (mismo patrón, todavía sin ejecutar). El guardián de catálogo
+(`guardian_de_catalogo`) correrá contra el esquema completo cuando exista y
+hará fallar la suite ante cualquier tabla sin política, sin RLS o con otro
+propietario.
 
-| Tabla | `lumin_app` GRANT | `lumin_app` política | `lumin_espejo` | `lumin_migracion` |
-|---|---|---|---|---|
-| Datos de negocio (`sucursal`, `pantalla`, `contenido`, `programacion`, `lista`, `lista_elemento`, `ajustes_sucursal`, `comando_pantalla`, `turno_vigente`, `descarga_diaria`, `trabajo`) | `SELECT, INSERT, UPDATE, DELETE` | `FOR ALL USING (empresa_id = gc('empresa_id')) WITH CHECK (igual)` | `SELECT`, `USING (true)` | todo, exento |
-| `pantalla`, además | — | `FOR SELECT/UPDATE USING (id_dispositivo = gc('id_dispositivo'))` para el latido sin sesión | ídem | ídem |
-| `empresa` | `SELECT` | `USING (id = gc('empresa_id') OR id IN (SELECT empresa_id FROM membresia WHERE usuario_id = gc('usuario_id')))` | `SELECT`, `USING (true)` | todo |
-| `membresia`, `membresia_sucursal` | `SELECT` (escritura en B4) | `USING (empresa_id = gc('empresa_id') OR usuario_id = gc('usuario_id'))` — la segunda rama permite resolver "mis empresas" antes de conocer la empresa | `SELECT`, `USING (true)` | todo |
-| `usuario` | `SELECT` (`UPDATE` de `contrasena_*` en B4) | `USING (id = gc('usuario_id') OR (gc('fase') = 'login' AND nombre_usuario = gc('nombre_usuario')))` | `SELECT`, `USING (true)` | todo |
-| `sesion` | `SELECT, INSERT, UPDATE` | `USING (token_hash = gc('token_hash') OR usuario_id = gc('usuario_id'))` **y** `WITH CHECK (token_hash = gc('token_hash') OR usuario_id = gc('usuario_id'))` — la rama del token en `WITH CHECK` es la que permite el logout (hallazgo del ensayo) | `SELECT`, `USING (true)` | todo |
-| `auditoria` | **solo `INSERT`** | `FOR INSERT WITH CHECK (empresa_id IS NULL OR empresa_id = gc('empresa_id'))` — `NULL` para los eventos sin empresa (login fallido) | `SELECT`, `USING (true)` | todo |
-| `espejo_marca` | **solo `INSERT`** | `FOR INSERT WITH CHECK (true)` — la marca no lleva datos | `SELECT` `USING (true)` y `UPDATE (procesada_en)` `USING (true) WITH CHECK (true)` | todo |
-| `espejo_estado` | ninguno | ninguna | `SELECT, UPDATE`, `FOR ALL USING (true) WITH CHECK (true)` | todo |
-| `migracion_json` | ninguno | ninguna | `SELECT` | todo |
+| Tabla | `lumin_app` GRANT | `lumin_app` política | `lumin_espejo` | `lumin_migracion` | Ensayado / Contrato |
+|---|---|---|---|---|---|
+| `sucursal`, `trabajo` | `SELECT, INSERT, UPDATE, DELETE` (`trabajo`: sin `DELETE`) | `FOR ALL USING (empresa_id = gc('empresa_id')) WITH CHECK (igual)` | `SELECT`, `USING (true)` | todo, exento | **Ensayado** |
+| `pantalla`, `contenido`, `programacion`, `lista`, `lista_elemento`, `ajustes_sucursal`, `comando_pantalla`, `turno_vigente`, `descarga_diaria` | `SELECT, INSERT, UPDATE, DELETE` | mismo patrón que `sucursal` | `SELECT`, `USING (true)` | todo | Contrato (mismo patrón) |
+| `pantalla`, además | — | `FOR SELECT/UPDATE USING (id_dispositivo = gc('id_dispositivo'))` para el latido sin sesión | ídem | ídem | Contrato |
+| `empresa` | `SELECT` | `USING (id = gc('empresa_id') OR heredada OR id IN (SELECT empresa_id FROM membresia WHERE usuario_id = gc('usuario_id')))` — la rama `heredada` (rev. 4) es la que permite arrancar sin contexto: latido de la TV, rutas 6.x y sesiones migradas | `SELECT`, `USING (true)` | todo | **Ensayado** |
+| `membresia` | `SELECT` (escritura en B4) | `USING (empresa_id = gc('empresa_id') OR usuario_id = gc('usuario_id'))` — la segunda rama permite comprobar la propia membresía antes de asignar la empresa | `SELECT`, `USING (true)` | todo | **Ensayado** |
+| `membresia_sucursal` | `SELECT` | mismo patrón que `membresia` (vía `membresia_id`) | `SELECT`, `USING (true)` | todo | Contrato |
+| `usuario` | `SELECT` (`UPDATE` de `contrasena_*` en B4) | `USING (id = gc('usuario_id') OR (gc('fase') = 'login' AND nombre_usuario = gc('nombre_usuario')))` | `SELECT`, `USING (true)` | todo | **Ensayado** |
+| `sesion` | `SELECT, INSERT, UPDATE` | `USING (token_hash = gc('token_hash') OR usuario_id = gc('usuario_id'))` **y** `WITH CHECK (token_hash = gc('token_hash') OR usuario_id = gc('usuario_id'))` — la rama del token en `WITH CHECK` es la que permite el logout (hallazgo del ensayo) | `SELECT`, `USING (true)` | todo | **Ensayado** |
+| `auditoria` | **solo `INSERT`** | `FOR INSERT WITH CHECK (empresa_id IS NULL OR empresa_id = gc('empresa_id'))` — `NULL` para los eventos sin empresa (login fallido) | `SELECT`, `USING (true)` | todo | **Ensayado** |
+| `espejo_marca` | **solo `INSERT`** | `FOR INSERT WITH CHECK (true)` — la marca no lleva datos | `SELECT` `USING (true)` y `UPDATE (procesada_en)` `USING (true) WITH CHECK (true)` | todo | **Ensayado** |
+| `espejo_estado` | ninguno | ninguna | `SELECT, UPDATE`, `FOR ALL USING (true) WITH CHECK (true)` | todo | **Ensayado** |
+| `migracion_json` | ninguno | ninguna | `SELECT` | todo | Contrato |
+| Roles y cluster | `lumin_migracion` es miembro de `pg_signal_backend` y `pg_read_all_stats` (drenaje de §7.3); nadie tiene `SUPERUSER`, `BYPASSRLS` ni `CREATEROLE` | | | | **Ensayado** |
 
 Notas ensayadas: las columnas `GENERATED … AS IDENTITY` de `auditoria` y
 `espejo_marca` **no** exigen `USAGE` sobre su secuencia para insertar como
@@ -446,16 +470,29 @@ Notas ensayadas: las columnas `GENERATED … AS IDENTITY` de `auditoria` y
 políticas (`pg_policies` viaja con el volcado).
 
 **Arranque de la autenticación con una sesión migrada (`empresa_id NULL`),
-precisión pedida por Codex.** Orden exacto dentro de la transacción de la
-petición: (1) `SET LOCAL lumin.token_hash`; (2) `SELECT usuario_id, empresa_id
-FROM sesion` (la política deja pasar solo esa fila); (3) `SET LOCAL
-lumin.usuario_id`; (4) si `empresa_id` es `NULL` —todas las migradas— se toma
-la **empresa heredada** de §8a (`LUMIN_EMPRESA_HEREDADA=lumin`), no una
-consulta a `membresia`, y se comprueba que el usuario tiene membresía en ella
-(`SELECT 1 FROM membresia WHERE usuario_id = gc('usuario_id') AND empresa_id =
-gc('empresa_id')`, permitido por la política); si no la tiene, 401 y auditoría;
-(5) `SET LOCAL lumin.empresa_id`. Desde B4, `sesion.empresa_id` es obligatoria
-y el paso 4 desaparece. El login por contraseña se ensaya en
+orden corregido en la rev. 4 (B3-R3-01).** Dentro de la transacción de la
+petición, y sin filtrar nunca `membresia` por una empresa que aún no está en
+el contexto:
+
+1. `SET LOCAL lumin.token_hash`.
+2. `SELECT usuario_id, empresa_id FROM sesion WHERE revocada_en IS NULL AND
+   expira_en > now()` — la política deja pasar solo esa fila; cero filas → 401.
+3. `SET LOCAL lumin.usuario_id`.
+4. Si `empresa_id` es `NULL` (todas las migradas): `SELECT id FROM empresa
+   WHERE heredada` — visible **sin** contexto por la rama `heredada` de la
+   política; es la misma consulta con la que las rutas 6.x (latido, `/videos/`)
+   construyen su `Contexto` sin usuario. Después `SELECT 1 FROM membresia
+   WHERE usuario_id = $usuario AND empresa_id = $heredada` **con los dos como
+   parámetros**, permitido por la rama `usuario_id = gc('usuario_id')`; cero
+   filas → 401 y auditoría.
+5. `SET LOCAL lumin.empresa_id`.
+
+Desde B4, `sesion.empresa_id` es obligatoria y el paso 4 desaparece; una
+sesión con empresa (creada por 6.11) no consulta la heredada. Ensayado en
+`resolver_sesion_migrada` (`test_ensayo_rls.py`): membresía válida → resuelve
+la heredada y ve sus datos; sin membresía → 401 y el contexto queda vacío;
+membresía solo en otra empresa → 401; revocada o vencida → 401; con empresa
+propia → no toca la heredada. El login por contraseña se ensaya en
 `test_app_sesiones_y_login`: con `fase = 'login'` el nombre resuelve **una**
 fila; sin la fase, el mismo nombre resuelve **cero**.
 
@@ -690,9 +727,16 @@ T+7 días  Si todo bien y el espejo lleva 7 días sincronizado: LUMIN_ESPEJO_JSO
 T+30 días Se archivan los JSON congelados (no se borran).
 ```
 
-Si algo falla en los pasos 3–5, la reversión es inmediata: parar 6.11,
-arrancar 6.10 sin solo lectura sobre los JSON de siempre, que **nadie
-escribió** desde el paso 1 salvo el humo, cuyo efecto está listado.
+Si algo falla en los pasos 3–5, la reversión es inmediata **pero pasa por el
+mismo guardián** que cualquier otra (rev. 4, B3-R3-02): `revertir.py` pone solo
+lectura, **drena** las transacciones de `lumin_app` en vuelo (espera hasta 30 s
+y después las cancela con `pg_cancel_backend`, para lo que `lumin_migracion` es
+miembro de `pg_signal_backend` y `pg_read_all_stats`), espera a que el espejo
+deje cero marcas pendientes, verifica §7.4-8 y regenera `sesiones.json` con
+el estado final (§7.6); solo entonces arranca 6.10. Los JSON que **nadie
+escribió** desde el paso 1 salvo el humo hacen que esa verificación sea
+trivial, pero no se omite. No existe una ruta de reversión que se salte el
+guardián.
 
 ### 7.4 Escrituras posteriores al cambio: el espejo derivado
 
@@ -793,8 +837,8 @@ añada B4); las sesiones creadas después del corte (§7.6); y la diferencia
 | Contraseña fija del código (QA-F03) | **Sigue existiendo en B3** para el bootstrap del `admin`. Se declara. B4 la elimina y obliga a rotar la del `admin` | B3 no toca autenticación por alcance |
 | Sesiones vigentes en el corte | Se migran (`token_hash = sha256(token)`, misma `exp`, `empresa_id NULL`); **no se revocan**. La cookie de cada quien sigue sirviendo | Cero fricción el día del corte |
 | Sesiones vencidas | No se migran | Basura |
-| **`sesiones.json` durante B3 y al revertir** (B3-QA-02, corregido por **B3-R2-02**) | El espejo **regenera** `sesiones.json` en cada ciclo como **copia congelada ∩ vigentes en PostgreSQL**: de la copia del corte (`json-congelados/…/sesiones.json`, que sí tiene los tokens en claro, como hoy) conserva solo los tokens cuyo `sha256` sigue en `sesion` con `revocada_en IS NULL`, `expira_en > now()` y usuario activo; `exp` = el menor de los dos. Un logout o una baja de usuario durante B3 desaparece del archivo en ≤ 2 s. Las sesiones creadas **después** del corte existen solo como hash y **no** se vuelcan: al revertir quedan cerradas y esas personas entran una vez. Cuando la última sesión anterior al corte vence, el archivo regenerado queda vacío y la copia congelada deja de tener valor. **Contrato:** revertir conserva revocaciones, vencimientos y bajas; conserva las sesiones anteriores al corte **solo** si siguen vigentes; cierra las posteriores | Ensayado con el servidor 6.10 real (`test_ensayo_sesiones.py`): reproducción del defecto de la copia congelada y contrato corregido. Sin tokens nuevos en claro en ningún lado |
-| Si PostgreSQL no está disponible al revertir | La reversión ya está bloqueada por §7.4-9. Si Adrián decide forzarla, el último `sesiones.json` regenerado (≤ 2 s de antigüedad) es el que se usa, y queda anotado. **Decisión D7** (§9): si prefiere que toda reversión cierre todas las sesiones (más simple, una molestia única), el espejo escribe `{}` en vez de la intersección | Se declara para que no se asuma |
+| **`sesiones.json` durante B3 y al revertir** (B3-QA-02, corregido por **B3-R2-02**) | El espejo **regenera** `sesiones.json` en cada ciclo como **copia congelada ∩ vigentes en PostgreSQL**: de la copia del corte (`json-congelados/…/sesiones.json`, que sí tiene los tokens en claro, como hoy) conserva solo los tokens cuyo `sha256` sigue en `sesion` con `revocada_en IS NULL`, `expira_en > now()` y usuario activo; `exp` = el menor de los dos. Un logout o una baja de usuario durante B3 desaparece del archivo en el siguiente ciclo del espejo (normalmente segundos; **la reversión no confía en esa frescura**: vuelve a calcular la intersección con el estado final, §7.3). Las sesiones creadas **después** del corte existen solo como hash y **no** se vuelcan: al revertir quedan cerradas y esas personas entran una vez. Cuando la última sesión anterior al corte vence, el archivo regenerado queda vacío y la copia congelada deja de tener valor. **Contrato:** revertir conserva revocaciones, vencimientos y bajas; conserva las sesiones anteriores al corte **solo** si siguen vigentes; cierra las posteriores | Ensayado con el servidor 6.10 real (`test_ensayo_sesiones.py`): reproducción del defecto de la copia congelada y contrato corregido. Sin tokens nuevos en claro en ningún lado |
+| Si PostgreSQL no está disponible al revertir (rev. 4, B3-R3-02) | **No hay reversión automática.** `revertir.py` se detiene: no puede comprobar el estado final y **nunca** usa el último `sesiones.json` exportado, porque una revocación posterior a esa exportación lo dejaría válido (Codex lo reprodujo; el ensayo también). La única vía de emergencia, y solo con autorización explícita de Adrián en ese momento, escribe `{}` de forma atómica: **todas** las sesiones cerradas, cada quien entra una vez; y el informe declara que los demás documentos pueden estar desactualizados desde `espejo_estado.exportada_en`. Antes de cualquier verificación final se **drenan** las transacciones de `lumin_app` en vuelo (§7.3) | Ensayado: `revertir` bloquea sin PostgreSQL, en emergencia cierra todas, en la ruta normal usa el estado final y no el último espejo; el drenaje espera y cancela. Recomendación de Codex para D7 incorporada |
 | Revocación masiva | **En B4**, cuando entren Argon2id y la sesión por ámbito: ahí se cierra todo y cada quien vuelve a entrar una vez, avisado | Una sola interrupción, cuando trae algo a cambio |
 | Reversión a 6.10 **después de B4** | **No está cubierta por este diseño.** Cuando B4 recifre a Argon2id, 6.10 no podrá verificar esas contraseñas. B4 definirá su propia marcha atrás (conservar el hash sha256 hasta validar B4, o restablecimiento por correo) | Se declara para que nadie lo asuma |
 
@@ -900,19 +944,23 @@ Protocolo, escrito ahora para que B5 no lo improvise:
   nombre sí.
 - **Posesión:** al reclamar se genera `posesion = gen_random_uuid()` y se
   devuelve al trabajador. **Publicar el resultado exige la posesión vigente.**
-- **Límites de transacción y publicación (precisión de Codex, para B5):** el
-  resultado se escribe primero en disco con un **nombre por versión**
-  (`<destino>/<nombre>.<digest8>.mp4`, idempotente: escribirlo dos veces da el
-  mismo archivo) y **después** una sola transacción hace `UPDATE trabajo SET
-  estado='hecho', terminado_en=now(), resultado=<ruta versionada> WHERE id=$1
-  AND posesion=$2 AND estado='en_curso'`. Si afecta 0 filas, el trabajador
-  borra su archivo versionado. El "nombre visible" (`<nombre>.mp4` que sirve
-  la URL heredada) no se renombra: `contenido.ruta_almacen` apunta a la ruta
-  versionada y la URL la resuelve. Así no existe el estado "hecho sin archivo":
-  el archivo existe antes del `UPDATE`, y un archivo versionado huérfano (crash
-  entre disco y `UPDATE`) lo recoge el barrido de en_curso y se reescribe
-  idéntico. Un `UPDATE` exitoso no "resuelve" la consistencia con disco: la
-  garantiza el orden archivo → `UPDATE` más nombres por versión.
+- **Publicación con artefacto por posesión (rev. 4, B3-R3-03):** el
+  resultado se escribe primero en disco con un nombre que lleva la **posesión**
+  (`<destino>/<nombre>.<digest8>.<posesion8>.mp4`), así dos posesiones del
+  mismo trabajo **nunca** comparten archivo; escribirlo dos veces con la misma
+  posesión es idempotente. **Después**, una sola transacción hace `UPDATE
+  trabajo SET estado='hecho', terminado_en=now(), resultado=<ruta> WHERE id=$1
+  AND posesion=$2 AND estado='en_curso'` (y, en la misma transacción, apunta
+  `contenido.ruta_almacen` a esa ruta). Si afecta 0 filas, el trabajador borra
+  **solo el archivo que lleva su posesión en el nombre**: no puede tocar el de
+  la posesión ganadora. El "nombre visible" (`<nombre>.mp4` de la URL heredada)
+  no se renombra: la URL lo resuelve por `ruta_almacen`. **Huérfanos** (crash
+  entre disco y `UPDATE`): un barrido borra los artefactos que ninguna fila
+  referencia **y** cuya posesión ya no está `en_curso`; mientras la posesión
+  viva, no se toca. Así no existe "hecho sin archivo" ni "archivo publicado
+  borrado por un rezagado". Ensayado en `test_ensayo_cola.py`, incluida la
+  reproducción del defecto de la rev. 3 (nombre compartido → `hecho` sin
+  archivo).
 - **Digest por destino (precisión de Codex):** `clave_idem = sha256(contenido)
   + tipo + sucursal_id`. Dos destinos de la misma empresa con el mismo archivo
   son **dos trabajos** (y dos publicaciones); compartir un artefacto por
@@ -981,7 +1029,7 @@ sintéticos en `servidor/tests/test_inventario_decisiones.py`. Imprime:
 | D3 | Row Level Security | Activarla desde el día uno; el costo es mínimo y elimina una clase entera de fugas |
 | D4 | Duración del espejo | 7 días de observación. Aprobarlos no sustituye el protocolo de §7.4 ni sus pruebas |
 | D5 | Ventana del corte | Se acuerda **después** de la implementación, los ensayos y la revisión de Codex. No bloquea nada de este diseño |
-| D7 | Sesiones al revertir (§7.6) | **Propuesta:** el espejo regenera `sesiones.json` como copia congelada ∩ vigentes: quien no cerró sesión sigue dentro; quien la cerró, sigue fuera. Alternativa más simple: toda reversión cierra todas las sesiones y cada quien entra una vez. Las dos conservan revocaciones; la diferencia es solo la molestia |
+| D7 | Sesiones al revertir (§7.6) | **Propuesta (coincide con la recomendación de Codex):** con PostgreSQL accesible, conservar solo las sesiones anteriores al corte **verificadas** vigentes en el estado final (copia congelada ∩ vigentes, tras drenar); sin PostgreSQL, **no revertir**; si tú autorizas una emergencia, cerrar **todas**. Alternativa: cerrar todas siempre (una molestia única, menos piezas). Ninguna opción usa el último archivo exportado |
 | D6 | Copia anonimizada de los JSON reales para el ensayo | Primero entrego `anonimizar_json.py` y la lista exacta de campos que elimina o reemplaza (hashes, sales, tokens, **mensajes del cintillo, turnos, nombres de usuario, zonas y nombres de archivo**, que también pueden revelar cosas); tú revisas la lista, la corres en el VPS y decides si compartes la salida. Ejecutar y transferir datos reales requiere tu autorización expresa; no se ha hecho |
 
 ---
@@ -1067,7 +1115,7 @@ respaldo sí, adaptado a `pg_dump` (§7.5).
 ## 13. Lo que pido para cerrar la revisión
 
 - Las siete decisiones de §9 (D7 es nueva en esta revisión).
-- Que Codex repita los 21 ensayos de `servidor/ensayos_b3/` en su entorno
+- Que Codex repita los 39 ensayos de `servidor/ensayos_b3/` en su entorno
   (necesitan un PostgreSQL 16 de ensayo y `psycopg` 3; el README dice cómo).
   Son la evidencia de B3-R2-01/02/03; sin repetirlos, cuentan como evidencia
   aportada por Claude.

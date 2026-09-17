@@ -27,7 +27,9 @@ CLAVE_ENSAYO = "ensayo"  # solo para la base local de ensayo
 
 EMPRESA_A = uuid.UUID("00000000-0000-0000-0000-00000000000a")
 EMPRESA_B = uuid.UUID("00000000-0000-0000-0000-00000000000b")
-USUARIO_1 = uuid.UUID("00000000-0000-0000-0000-000000000101")
+USUARIO_1 = uuid.UUID("00000000-0000-0000-0000-000000000101")               # membresía en A (heredada)
+USUARIO_AJENO = uuid.UUID("00000000-0000-0000-0000-000000000102")           # membresía solo en B
+USUARIO_SIN_MEMBRESIA = uuid.UUID("00000000-0000-0000-0000-000000000103")   # sin membresía
 
 
 def dsn_admin() -> str:
@@ -53,13 +55,18 @@ def preparar_base() -> None:
                 from psycopg import sql
                 c.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE " + extra)
                           .format(sql.Identifier(rol), sql.Literal(CLAVE_ENSAYO)))
+        # revertir.py necesita cancelar transacciones de lumin_app en vuelo (drenaje)
+        c.execute("GRANT pg_signal_backend, pg_read_all_stats TO lumin_migracion")
         c.execute(f"DROP DATABASE IF EXISTS {BASE} WITH (FORCE)")
         c.execute(f"CREATE DATABASE {BASE} OWNER lumin_migracion")
     with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
         c.execute(DDL.read_text(encoding="utf-8"))
-        c.execute("INSERT INTO empresa (id, clave, estado) VALUES (%s, 'lumin', 'activa'), (%s, 'otra', 'suspendida')",
+        c.execute("INSERT INTO empresa (id, clave, estado, heredada) VALUES (%s, 'lumin', 'activa', true), (%s, 'otra', 'suspendida', false)",
                   (EMPRESA_A, EMPRESA_B))
-        c.execute("INSERT INTO usuario (id, nombre_usuario) VALUES (%s, 'admin')", (USUARIO_1,))
+        c.execute("INSERT INTO usuario (id, nombre_usuario) VALUES (%s, 'admin'), (%s, 'ajeno'), (%s, 'huerfano')",
+                  (USUARIO_1, USUARIO_AJENO, USUARIO_SIN_MEMBRESIA))
+        c.execute("INSERT INTO membresia (empresa_id, usuario_id, rol) VALUES (%s, %s, 'admin_empresa'), (%s, %s, 'operador')",
+                  (EMPRESA_A, USUARIO_1, EMPRESA_B, USUARIO_AJENO))
 
 
 def contexto(cur, empresa=None, usuario=None, token_hash=None, fase=None, nombre_usuario=None):

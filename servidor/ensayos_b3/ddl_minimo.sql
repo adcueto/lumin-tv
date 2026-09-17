@@ -1,8 +1,10 @@
--- DDL MINIMO para ensayar los protocolos del diseño B3 (revisión 3).
+-- DDL MINIMO para ensayar los protocolos del diseño B3 (revisión 4).
 -- NO es el esquema del producto: solo las tablas necesarias para demostrar
 --   (1) el espejo por marcas pendientes con instantánea consistente,
 --   (2) el contrato de roles y políticas RLS,
---   (3) la regeneración de sesiones.json con revocaciones.
+--   (3) la regeneración de sesiones.json con revocaciones,
+--   (4) el arranque de una sesión migrada contra la empresa heredada,
+--   (5) la publicación de trabajos con artefacto por posesión.
 -- Se ejecuta como lumin_migracion sobre una base de ensayo vacía.
 
 CREATE SCHEMA IF NOT EXISTS lumin AUTHORIZATION lumin_migracion;
@@ -14,11 +16,13 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE TABLE empresa (
-  id      uuid PRIMARY KEY,
-  clave   text NOT NULL UNIQUE,
-  estado  text NOT NULL DEFAULT 'activa' CHECK (estado IN ('activa','suspendida'))
+  id        uuid PRIMARY KEY,
+  clave     text NOT NULL UNIQUE,
+  estado    text NOT NULL DEFAULT 'activa' CHECK (estado IN ('activa','suspendida')),
+  heredada  boolean NOT NULL DEFAULT false   -- la empresa de las rutas 6.x (LUMIN)
 );
-CREATE UNIQUE INDEX una_sola_activa ON empresa ((true)) WHERE estado = 'activa';
+CREATE UNIQUE INDEX una_sola_activa   ON empresa ((true)) WHERE estado = 'activa';
+CREATE UNIQUE INDEX una_sola_heredada ON empresa ((true)) WHERE heredada;
 
 CREATE TABLE sucursal (
   id          uuid PRIMARY KEY,
@@ -33,6 +37,14 @@ CREATE TABLE usuario (
   id              uuid PRIMARY KEY,
   nombre_usuario  text NOT NULL UNIQUE,
   activo          boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE membresia (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  empresa_id  uuid NOT NULL REFERENCES empresa(id),
+  usuario_id  uuid NOT NULL REFERENCES usuario(id),
+  rol         text NOT NULL CHECK (rol IN ('admin_empresa','operador')),
+  UNIQUE (empresa_id, usuario_id)
 );
 
 CREATE TABLE sesion (
@@ -50,6 +62,22 @@ CREATE TABLE auditoria (
   usuario_id   uuid,
   accion       text NOT NULL,
   datos        jsonb NOT NULL DEFAULT '{}'
+);
+
+-- Cola de trabajos (solo lo necesario para ensayar la publicación por posesión).
+CREATE TABLE trabajo (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  empresa_id    uuid NOT NULL REFERENCES empresa(id),
+  tipo          text NOT NULL,
+  clave_idem    text,
+  posesion      uuid,
+  estado        text NOT NULL DEFAULT 'pendiente'
+                CHECK (estado IN ('pendiente','en_curso','hecho','fallido','cancelado')),
+  intentos      int  NOT NULL DEFAULT 0,
+  no_antes_de   timestamptz NOT NULL DEFAULT now(),
+  latido_en     timestamptz,
+  resultado     text,                       -- ruta del artefacto publicado (por posesion)
+  terminado_en  timestamptz
 );
 
 -- Outbox del espejo. La transacción que muta datos inserta una fila; el hilo
@@ -76,6 +104,8 @@ INSERT INTO espejo_estado DEFAULT VALUES;
 ALTER TABLE empresa       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sucursal      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE usuario       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE membresia     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE trabajo       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sesion        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auditoria     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE espejo_marca  ENABLE ROW LEVEL SECURITY;
@@ -88,14 +118,30 @@ GRANT USAGE ON SCHEMA public TO lumin_app, lumin_espejo;
 GRANT SELECT                          ON empresa       TO lumin_app;
 GRANT SELECT, INSERT, UPDATE, DELETE  ON sucursal      TO lumin_app;
 GRANT SELECT                          ON usuario       TO lumin_app;
+GRANT SELECT                          ON membresia     TO lumin_app;
+GRANT SELECT, INSERT, UPDATE          ON trabajo       TO lumin_app;
 GRANT SELECT, INSERT, UPDATE          ON sesion        TO lumin_app;
 GRANT INSERT                          ON auditoria     TO lumin_app;
 GRANT INSERT                          ON espejo_marca  TO lumin_app;
 -- (las columnas identity no exigen USAGE sobre su secuencia: se comprueba en
 --  el ensayo; si alguna versión lo exigiera, aquí iría el GRANT USAGE)
 
+-- La empresa heredada es visible sin contexto: las rutas 6.x (latido de la
+-- TV, /videos/) y el arranque de una sesión migrada la necesitan ANTES de
+-- tener empresa en el contexto (B3-R3-01).
 CREATE POLICY empresa_app ON empresa FOR SELECT TO lumin_app
-  USING (id = lumin.gc('empresa_id')::uuid);
+  USING (id = lumin.gc('empresa_id')::uuid
+         OR heredada
+         OR id IN (SELECT empresa_id FROM membresia WHERE usuario_id = lumin.gc('usuario_id')::uuid));
+
+-- Membresías: por empresa conocida, o las PROPIAS del usuario (para resolver
+-- la empresa antes de asignarla).
+CREATE POLICY membresia_app ON membresia FOR SELECT TO lumin_app
+  USING (empresa_id = lumin.gc('empresa_id')::uuid OR usuario_id = lumin.gc('usuario_id')::uuid);
+
+CREATE POLICY trabajo_app ON trabajo FOR ALL TO lumin_app
+  USING      (empresa_id = lumin.gc('empresa_id')::uuid)
+  WITH CHECK (empresa_id = lumin.gc('empresa_id')::uuid);
 
 CREATE POLICY sucursal_app ON sucursal FOR ALL TO lumin_app
   USING      (empresa_id = lumin.gc('empresa_id')::uuid)
@@ -119,13 +165,15 @@ CREATE POLICY marca_app ON espejo_marca FOR INSERT TO lumin_app
   WITH CHECK (true);
 
 -- ---- lumin_espejo: lee todo, solo escribe su propio estado --------------
-GRANT SELECT ON empresa, sucursal, usuario, sesion, auditoria, espejo_marca, espejo_estado TO lumin_espejo;
+GRANT SELECT ON empresa, sucursal, usuario, membresia, sesion, auditoria, trabajo, espejo_marca, espejo_estado TO lumin_espejo;
 GRANT UPDATE (procesada_en) ON espejo_marca  TO lumin_espejo;
 GRANT UPDATE                ON espejo_estado TO lumin_espejo;
 
 CREATE POLICY empresa_espejo   ON empresa       FOR SELECT TO lumin_espejo USING (true);
 CREATE POLICY sucursal_espejo  ON sucursal      FOR SELECT TO lumin_espejo USING (true);
 CREATE POLICY usuario_espejo   ON usuario       FOR SELECT TO lumin_espejo USING (true);
+CREATE POLICY membresia_espejo ON membresia     FOR SELECT TO lumin_espejo USING (true);
+CREATE POLICY trabajo_espejo   ON trabajo       FOR SELECT TO lumin_espejo USING (true);
 CREATE POLICY sesion_espejo    ON sesion        FOR SELECT TO lumin_espejo USING (true);
 CREATE POLICY auditoria_espejo ON auditoria     FOR SELECT TO lumin_espejo USING (true);
 CREATE POLICY marca_espejo_sel ON espejo_marca  FOR SELECT TO lumin_espejo USING (true);

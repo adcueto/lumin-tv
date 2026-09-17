@@ -1,0 +1,111 @@
+# Verificación automatizada de la rama de modernización.
+#
+# Es EVIDENCIA reproducible, no aprobación: la revisión independiente de Codex
+# y la validación en Roku físico siguen siendo necesarias (docs/coordinacion/06).
+# No usa credenciales ni datos de producción: todo es sintético y efímero.
+#
+# Cuatro trabajos, cada uno con su límite declarado:
+#   servidor   pytest servidor/tests (servidor 6.10 real en un temporal)
+#   roku       arnés de planificación con el intérprete brs + BrighterScript
+#   ensayos-b3 servidor/ensayos_b3 contra PostgreSQL 16 de servicio; exige
+#              0 omitidos: un verde con los ensayos saltados no vale
+#   inventario ya va dentro de `servidor` (tests/test_inventario_decisiones.py)
+
+name: verificacion
+
+on:
+  push:
+    branches: [modernizacion-diagnostico, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  servidor:
+    name: servidor 6.10 · pytest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r servidor/tests/requirements.txt
+      - name: pytest servidor/tests
+        working-directory: servidor
+        run: python -m pytest tests -q -rs --junitxml=../servidor-junit.xml
+      - name: sin omitidos
+        run: python .github/scripts/sin_omitidos.py servidor-junit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: servidor-junit
+          path: servidor-junit.xml
+
+  roku:
+    name: roku 5.2 · brs + bsc
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install -g @rokucommunity/brs@0.47.6 brighterscript@0.73.5
+      - name: arnés de planificación (código real de CacheTask.brs)
+        run: python3 roku-app/pruebas/correr.py | tee roku-planificacion.txt
+      - name: BrighterScript, 0 diagnósticos
+        working-directory: roku-app
+        run: |
+          bsc --rootDir . --files "source/**/*.brs" "components/**/*.brs" "components/**/*.xml" "manifest" \
+              --no-emit --diagnostic-level info 2>&1 | tee ../bsc.txt
+          if grep -Eiq "error|warning|info:" ../bsc.txt; then echo "diagnósticos encontrados"; exit 1; fi
+          rm -rf out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: roku-evidencia
+          path: |
+            roku-planificacion.txt
+            bsc.txt
+
+  ensayos-b3:
+    name: ensayos de diseño B3 · PostgreSQL 16
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      LUMIN_ENSAYO_PG: postgresql://postgres@127.0.0.1:55432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: cliente PostgreSQL 16 (pg_dump / pg_restore del ensayo de respaldo)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-16 || sudo apt-get install -y -qq postgresql-client
+          pg_dump --version
+      - run: python -m pip install -r servidor/tests/requirements.txt "psycopg[binary]>=3.2"
+      - name: pytest servidor/ensayos_b3
+        working-directory: servidor
+        run: python -m pytest ensayos_b3 -q -rs --junitxml=../ensayos-b3-junit.xml
+      - name: sin omitidos (39 ensayos deben ejecutarse)
+        run: python .github/scripts/sin_omitidos.py ensayos-b3-junit.xml --minimo 39
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ensayos-b3-junit
+          path: ensayos-b3-junit.xml

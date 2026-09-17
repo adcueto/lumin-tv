@@ -21,7 +21,8 @@ import psycopg
 import pytest
 from psycopg import errors
 
-from comun import EMPRESA_A, EMPRESA_B, USUARIO_1, BASE, CLAVE_ENSAYO, contexto, dsn_admin, dsn_rol, preparar_base
+from comun import (EMPRESA_A, EMPRESA_B, USUARIO_1, USUARIO_AJENO, USUARIO_SIN_MEMBRESIA, BASE, CLAVE_ENSAYO,
+                   contexto, dsn_admin, dsn_rol, preparar_base)
 
 
 @pytest.fixture
@@ -78,9 +79,11 @@ def test_app_no_lee_outbox_ni_auditoria(base):
 def test_app_controles_negativos_entre_empresas(base):
     with psycopg.connect(dsn_rol("lumin_app")) as c:
         cur = c.cursor()
-        # (1) sin contexto: cero filas, sin error
+        # (1) sin contexto: cero filas de datos; de empresa, SOLO la heredada (rev. 4)
         assert cuenta(cur, "SELECT count(*) FROM sucursal") == 0
-        assert cuenta(cur, "SELECT count(*) FROM empresa") == 0
+        assert cuenta(cur, "SELECT count(*) FROM trabajo") == 0
+        assert cuenta(cur, "SELECT count(*) FROM membresia") == 0
+        assert [r for r in cur.execute("SELECT clave, heredada FROM empresa")] == [("lumin", True)]
         c.commit()
         # (2) con contexto de A: solo A
         cur = c.cursor()
@@ -133,6 +136,79 @@ def test_app_sesiones_y_login(base):
         cur = c.cursor()
         contexto(cur, nombre_usuario="admin")                # mismo nombre SIN fase: nada
         assert cuenta(cur, "SELECT count(*) FROM usuario") == 0
+
+
+def resolver_sesion_migrada(conn, token_hash: str):
+    """§3.5 rev. 4, el orden exacto que ejecutará el servidor para una cookie.
+    Devuelve (usuario_id, empresa_id) o None (→ 401). Nunca consulta la
+    membresía filtrando por una empresa que aún no está en el contexto."""
+    cur = conn.cursor()
+    contexto(cur, token_hash=token_hash)                                   # 1
+    fila = cur.execute("SELECT usuario_id, empresa_id FROM sesion "
+                       "WHERE revocada_en IS NULL AND expira_en > now()").fetchone()   # 2
+    if fila is None:
+        return None
+    usuario_id, empresa_id = fila
+    contexto(cur, token_hash=token_hash, usuario=usuario_id)               # 3
+    if empresa_id is None:                                                 # 4 (solo migradas)
+        empresa_id = cur.execute("SELECT id FROM empresa WHERE heredada").fetchone()[0]   # visible sin contexto
+    tiene = cur.execute("SELECT 1 FROM membresia WHERE usuario_id = %s AND empresa_id = %s",
+                        (usuario_id, empresa_id)).fetchone()                # por la rama usuario_id de la política
+    if tiene is None:
+        return None
+    contexto(cur, token_hash=token_hash, usuario=usuario_id, empresa=empresa_id)   # 5
+    return usuario_id, empresa_id
+
+
+def _sesion(token_hash, usuario, empresa=None):
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        c.execute("INSERT INTO sesion (token_hash, usuario_id, empresa_id, expira_en) VALUES (%s, %s, %s, now() + interval '1 day')",
+                  (token_hash, usuario, empresa))
+
+
+def test_sesion_migrada_con_membresia_valida_resuelve_la_heredada(base):
+    """B3-R3-01: la consulta del paso 4 ya no depende de gc('empresa_id')."""
+    _sesion("mig-ok", USUARIO_1)
+    with psycopg.connect(dsn_rol("lumin_app")) as c:
+        assert resolver_sesion_migrada(c, "mig-ok") == (USUARIO_1, EMPRESA_A)
+        # y con el contexto ya puesto, ve los datos de la heredada
+        assert cuenta(c.cursor(), "SELECT count(*) FROM sucursal") == 1
+
+
+def test_sesion_migrada_sin_membresia_es_401(base):
+    _sesion("mig-huerfano", USUARIO_SIN_MEMBRESIA)
+    with psycopg.connect(dsn_rol("lumin_app")) as c:
+        assert resolver_sesion_migrada(c, "mig-huerfano") is None
+        assert cuenta(c.cursor(), "SELECT count(*) FROM sucursal") == 0   # nada quedó en el contexto
+
+
+def test_sesion_migrada_con_membresia_en_otra_empresa_es_401(base):
+    _sesion("mig-ajeno", USUARIO_AJENO)
+    with psycopg.connect(dsn_rol("lumin_app")) as c:
+        assert resolver_sesion_migrada(c, "mig-ajeno") is None
+
+
+def test_sesion_revocada_o_vencida_no_resuelve(base):
+    _sesion("mig-rev", USUARIO_1)
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        c.execute("UPDATE sesion SET revocada_en = now() WHERE token_hash = 'mig-rev'")
+    with psycopg.connect(dsn_rol("lumin_app")) as c:
+        assert resolver_sesion_migrada(c, "mig-rev") is None
+
+
+def test_sesion_nueva_con_empresa_no_consulta_la_heredada(base):
+    """Una sesión creada por 6.11 trae empresa_id; el paso 4 no se ejecuta."""
+    _sesion("nueva-b", USUARIO_AJENO, EMPRESA_B)
+    with psycopg.connect(dsn_rol("lumin_app")) as c:
+        assert resolver_sesion_migrada(c, "nueva-b") == (USUARIO_AJENO, EMPRESA_B)
+
+
+def test_latido_sin_sesion_ve_solo_la_heredada(base):
+    """Las rutas 6.x (TV, POS) construyen su Contexto con la heredada sin usuario."""
+    with psycopg.connect(dsn_rol("lumin_app")) as c:
+        cur = c.cursor()
+        assert cur.execute("SELECT id FROM empresa WHERE heredada").fetchone()[0] == EMPRESA_A
+        assert cuenta(cur, "SELECT count(*) FROM empresa") == 1
 
 
 def test_app_no_puede_escalar(base):
@@ -212,15 +288,63 @@ def test_por_que_no_force_rls(base):
         assert cuenta(c.cursor(), "SELECT count(*) FROM sucursal") == 2
 
 
-def test_ninguna_tabla_sin_rls_ni_politica_para_app(base):
-    """Guardián de catálogo: toda tabla del esquema tiene RLS activa; toda
-    tabla a la que lumin_app puede acceder tiene al menos una política suya."""
+def guardian_de_catalogo(conn) -> list[str]:
+    """Lo que correrá la suite de B3 contra el esquema real. Devuelve las
+    violaciones; la lista de tablas sale del catálogo, no de una constante."""
+    fallos = []
+    cur = conn.cursor()
+    for relname, owner, rls in cur.execute(
+            "SELECT c.relname, pg_get_userbyid(c.relowner), c.relrowsecurity FROM pg_class c "
+            "WHERE c.relkind = 'r' AND c.relnamespace = 'public'::regnamespace ORDER BY 1"):
+        if owner != "lumin_migracion":
+            fallos.append(f"{relname}: propietario {owner}, debe ser lumin_migracion")
+        if not rls:
+            fallos.append(f"{relname}: sin ROW LEVEL SECURITY")
+    con_grant = {r[0] for r in cur.execute(
+        "SELECT DISTINCT table_name FROM information_schema.role_table_grants WHERE grantee = 'lumin_app'")}
+    con_politica = {r[0] for r in cur.execute(
+        "SELECT DISTINCT tablename FROM pg_policies WHERE 'lumin_app' = ANY(roles)")}
+    for t in sorted(con_grant - con_politica):
+        fallos.append(f"{t}: GRANT a lumin_app sin política")
+    for rol in ("lumin_app", "lumin_espejo"):
+        fila = cur.execute("SELECT rolsuper, rolbypassrls, rolcreaterole FROM pg_roles WHERE rolname = %s", (rol,)).fetchone()
+        if fila != (False, False, False):
+            fallos.append(f"{rol}: atributos peligrosos {fila}")
+    return fallos
+
+
+def test_guardian_de_catalogo_limpio(base):
     with psycopg.connect(dsn_rol("lumin_migracion")) as c:
-        sin_rls = [r[0] for r in c.execute(
-            "SELECT relname FROM pg_class WHERE relkind = 'r' AND relnamespace = 'public'::regnamespace AND NOT relrowsecurity")]
-        assert sin_rls == []
-        con_grant = {r[0] for r in c.execute(
-            "SELECT DISTINCT table_name FROM information_schema.role_table_grants WHERE grantee = 'lumin_app'")}
-        con_politica = {r[0] for r in c.execute(
-            "SELECT DISTINCT tablename FROM pg_policies WHERE 'lumin_app' = ANY(roles)")}
-        assert con_grant - con_politica == set(), f"tablas con GRANT y sin política para lumin_app: {con_grant - con_politica}"
+        assert guardian_de_catalogo(c) == []
+
+
+def test_guardian_detecta_tabla_de_otro_propietario(base):
+    """B3-R3-04: caso negativo. Una tabla creada por lumin_app (si alguien le
+    diera CREATE) debe hacer fallar al guardián aunque tenga RLS y política."""
+    with psycopg.connect(dsn_admin(), autocommit=True) as adm:
+        info = psycopg.conninfo.conninfo_to_dict(dsn_admin()); info["dbname"] = BASE
+        with psycopg.connect(psycopg.conninfo.make_conninfo(**info), autocommit=True) as db:
+            db.execute("GRANT CREATE ON SCHEMA public TO lumin_app")
+    try:
+        with psycopg.connect(dsn_rol("lumin_app"), autocommit=True) as a:
+            a.execute("CREATE TABLE colada (id int, empresa_id uuid)")
+            a.execute("ALTER TABLE colada ENABLE ROW LEVEL SECURITY")
+            a.execute("CREATE POLICY colada_app ON colada FOR ALL TO lumin_app USING (true)")
+        with psycopg.connect(dsn_rol("lumin_migracion")) as c:
+            fallos = guardian_de_catalogo(c)
+        assert any(f.startswith("colada: propietario lumin_app") for f in fallos), fallos
+        # y como propietaria, lumin_app se saltaría su propia política (ENABLE sin FORCE):
+        # es exactamente lo que el guardián impide que llegue a producción
+    finally:
+        with psycopg.connect(dsn_rol("lumin_app"), autocommit=True) as a:
+            a.execute("DROP TABLE IF EXISTS colada")
+
+
+def test_guardian_detecta_tabla_sin_rls_y_grant_sin_politica(base):
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        c.execute("CREATE TABLE nueva_sin_rls (id int)")
+        c.execute("GRANT SELECT ON nueva_sin_rls TO lumin_app")
+        fallos = guardian_de_catalogo(c)
+        c.execute("DROP TABLE nueva_sin_rls")
+    assert "nueva_sin_rls: sin ROW LEVEL SECURITY" in fallos
+    assert "nueva_sin_rls: GRANT a lumin_app sin política" in fallos

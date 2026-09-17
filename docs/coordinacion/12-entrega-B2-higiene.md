@@ -212,3 +212,13 @@ vacío válido, alias con sufijos iguales, D2, sin credenciales y sin
 modificar archivos). Suite del servidor: **21 pasan**. La salida sigue sin
 ser anónima (usuarios, sucursales, zonas): es para que Adrián decida, y no
 se ha ejecutado sobre datos reales.
+
+## Nota R5 (2026-09-17): verificación automatizada
+
+`.github/workflows/verificacion.yml`: tres trabajos en cada push a la rama
+(servidor con pytest; Roku con el arnés `brs` y BrighterScript; ensayos B3
+contra un servicio PostgreSQL 16 con `pg_dump` real). El guardián
+`.github/scripts/sin_omitidos.py` convierte en rojo cualquier prueba
+omitida o un conteo menor al esperado (39 ensayos), como pidió Codex: un
+verde con los ensayos saltados no vale. Es evidencia reproducible, no
+sustituye la revisión independiente. Sin credenciales ni datos de producción.
