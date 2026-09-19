@@ -1,0 +1,46 @@
+# Panel v2 — propuesta visual (B6, láminas antes de código)
+
+`prototipo.html` es una maqueta estática con datos de ejemplo: no habla con
+ningún servidor, no guarda nada y no es código del producto. Sirve para que
+Adrián apruebe o corrija la interfaz **antes** de programar el panel React
+(decisión `21-decision-tecnologias-v2.md`). Las capturas en `capturas/` se
+generan con `capturar.py` (Playwright, Chromium) a 1366×860 (escritorio) y
+390×844 (celular).
+
+## Qué propone
+
+| Pantalla | Para quién | Qué resuelve |
+|---|---|---|
+| Inicio | Adrián en escritorio; recepción en celular | Estado real de cada pantalla (B5a): qué reproduce, cache, versión, sin red desde cuándo; avisos accionables (archivo que falta, app vieja, pantalla sin conexión) |
+| Pantallas | Administración | Aprobar pantallas nuevas con su código; número único por sucursal (fin de los dos P6); "Lista al aire" como lista base; turnos por pantalla; recargar y vaciar cache (B5a); mover, renombrar, eliminar bajo ⋯ |
+| Mostrar ahora | Recepción en celular | **Un solo flujo** para foto, video o mensaje: dónde, qué, cuánto tiempo; recientes a un toque; "Ahora mismo" lista lo que está fuera de la lista y permite quitarlo (unifica "Mostrar al cliente" y "Enviar a…") |
+| Turnos | Recepción en celular | Estado del punto de venta, turno en pantalla con tiempo restante, próximos, anuncio manual con duración; deduplicación declarada |
+| Biblioteca | Adrián | Subida con límites explícitos (80 MB por la cache de la TV), filtros, "sin usar", archivos que faltan marcados, conversión en curso, reproducciones **confirmadas** (no descargas) |
+| Listas | Adrián | Lista base + listas propias, orden arrastrable, segundos por foto, dónde está asignada, confirmación de recepción por pantalla |
+| Usuarios y permisos | Adrián | Permisos explícitos por sucursal; usuario sin sucursales marcado (QA-F01); rol "integración" para el POS |
+
+Navegación: las once secciones del plan (`10-…md §4.2`) en menú lateral en
+escritorio; en celular, barra inferior con Inicio, Mostrar, Turnos, Pantallas
+y Más. Programación, Mensajes, Sucursales e Integraciones se diseñan en su
+bloque; aquí solo están como marcador.
+
+Marca: los tokens del panel actual (rosa `#EFAFC7`, rosa fuerte `#EC3A80`,
+dorado `#C8A96A`, tinta `#1F1F1F`, gris `#6B7280`, Poppins). Nada del tema
+oscuro de la TV, que es otra pieza.
+
+## Supuestos que Adrián debe confirmar o corregir
+
+1. La recepcionista usa el panel desde el **celular** para Mostrar ahora y
+   Turnos; Adrián usa el **escritorio** para Biblioteca, Listas, Pantallas y
+   Usuarios. Si es al revés en algún caso, cambia qué se diseña primero.
+2. "Lista al aire" es el nombre de la lista base de cada sucursal (hoy es la
+   opción vacía del selector). Se puede llamar de otra forma.
+3. Los botones de operación remota (↻, ⌫) y eliminar son solo de administrador.
+4. El flujo unificado de "Mostrar ahora" sustituye a "Mostrar al cliente" y
+   "Enviar a…" del panel actual.
+
+## Qué NO es
+
+No hay componentes React todavía, ni llamadas a la API, ni estados de carga,
+vacío, error o falta de permiso (esos se implementan en B6 con la regla del
+plan: sin datos simulados y con permisos aplicados en el servidor).

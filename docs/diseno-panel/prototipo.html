@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LUMIN TV · panel v2 · propuesta</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--rosa:#EFAFC7;--rosa-claro:#F6C8D8;--fondo:#F7F7F8;--hover:#FCE6EE;--dorado:#C8A96A;--tinta:#1F1F1F;--gris:#6B7280;--borde:#ECECEC;--rosa-fuerte:#EC3A80;--exito:#34C759;--error:#FF5A5F;--ambar:#E5A100;--blanco:#fff}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.5 "Poppins",system-ui,sans-serif;color:var(--tinta);background:var(--fondo)}
+a{color:inherit;text-decoration:none}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.lat{background:var(--blanco);border-right:1px solid var(--borde);padding:18px 14px;display:flex;flex-direction:column;gap:4px}
+.marca{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+.marca .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--rosa),var(--dorado))}
+.marca b{font-size:15px;letter-spacing:.3px}
+.marca small{display:block;color:var(--gris);font-size:11px}
+.grupo{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--gris);padding:12px 10px 4px}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;color:#333}
+.nav a.on{background:var(--hover);color:var(--rosa-fuerte);font-weight:600}
+.nav a .ico{width:18px;text-align:center;opacity:.8}
+.nav a .n{margin-left:auto;background:var(--rosa-fuerte);color:#fff;border-radius:20px;font-size:10.5px;padding:0 7px;font-weight:600}
+.yo{margin-top:auto;padding:10px;border-top:1px solid var(--borde);font-size:12px;color:var(--gris)}
+.yo b{display:block;color:var(--tinta);font-size:13px}
+main{padding:22px 28px 90px;max-width:1180px}
+.cab{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.cab h1{font-size:22px;font-weight:600}
+.suc{margin-left:auto;display:flex;gap:8px;align-items:center;background:var(--blanco);border:1px solid var(--borde);border-radius:12px;padding:6px 12px;font-weight:500}
+.suc:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--exito)}
+.card{background:var(--blanco);border:1px solid var(--borde);border-radius:16px;padding:18px 20px;margin-bottom:16px}
+.card h2{font-size:15px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.card h2 small{color:var(--gris);font-weight:400;font-size:12.5px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.tile{background:var(--blanco);border:1px solid var(--borde);border-radius:16px;padding:14px 16px}
+.tile .v{font-size:26px;font-weight:600;line-height:1.1}
+.tile .l{color:var(--gris);font-size:12px}
+.tile.ok .v{color:var(--exito)}.tile.mal .v{color:var(--error)}.tile.aviso .v{color:var(--ambar)}
+.fila{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--borde)}
+.fila:first-of-type{border-top:0}
+.num{width:38px;height:38px;border-radius:12px;background:var(--rosa-claro);color:var(--rosa-fuerte);display:grid;place-items:center;font-weight:700;flex:none}
+.num.off{background:#eee;color:#999}
+.info{flex:1;min-width:0}
+.info b{font-weight:600}
+.det{font-size:12px;color:var(--gris);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.pto{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block}
+.pto.on{background:var(--exito)}.pto.amb{background:var(--ambar)}
+.chip{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;background:#F1F1F3;color:#444}
+.chip.aire{background:#FFF4D6;color:#8A6400;border:1px solid #F0DDA3}
+.chip.rosa{background:var(--hover);color:var(--rosa-fuerte)}
+.chip.err{background:#FFE9EA;color:#B3262B}
+.acc{display:flex;gap:6px;flex:none}
+.btn{border:1px solid var(--borde);background:var(--blanco);border-radius:10px;padding:6px 10px;font:inherit;font-size:12.5px;cursor:pointer;color:#333}
+.btn.p{background:var(--rosa-fuerte);border-color:var(--rosa-fuerte);color:#fff;font-weight:600}
+.btn.g{background:var(--dorado);border-color:var(--dorado);color:#fff;font-weight:600}
+.btn.ic{width:34px;padding:6px 0;text-align:center}
+.btn.peligro{color:var(--error)}
+.aviso{display:flex;gap:10px;padding:10px 12px;border-radius:12px;background:#FFF8E6;border:1px solid #F3E2B3;margin-bottom:8px;font-size:13px}
+.aviso.err{background:#FFEFEF;border-color:#F5C6C8}
+.aviso .t{font-weight:600}
+.aviso .q{color:var(--gris)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--gris);font-weight:500;font-size:12px;padding:8px 10px;border-bottom:1px solid var(--borde)}
+td{padding:10px;border-bottom:1px solid var(--borde);vertical-align:middle}
+.sw{width:34px;height:20px;border-radius:20px;background:#ddd;position:relative;display:inline-block}
+.sw.on{background:var(--exito)}
+.sw:after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.sw.on:after{left:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px}
+.mini{border:1px solid var(--borde);border-radius:14px;overflow:hidden;background:var(--blanco)}
+.mini .img{aspect-ratio:9/16;background:linear-gradient(160deg,#F3D9E2,#E9C7A6);position:relative}
+.mini .img.h{aspect-ratio:16/9}
+.mini .img .dur{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:1px 7px;border-radius:8px}
+.mini .img .tipo{position:absolute;left:8px;top:8px;background:rgba(255,255,255,.85);font-size:10.5px;padding:1px 7px;border-radius:8px;font-weight:600}
+.mini .txt{padding:8px 10px}
+.mini .txt b{font-size:12.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini .txt small{color:var(--gris);font-size:11px}
+.drop{border:2px dashed #E4C9D3;border-radius:14px;padding:22px;text-align:center;color:var(--gris);margin-bottom:14px;background:#FFFBFC}
+.dos{display:grid;grid-template-columns:300px 1fr;gap:16px}
+.lista{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--borde);margin-bottom:8px;background:var(--blanco)}
+.lista.on{border-color:var(--rosa);background:var(--hover)}
+.lista b{font-size:13.5px}
+.lista small{display:block;color:var(--gris);font-size:11.5px}
+.item{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--borde);border-radius:12px;margin-bottom:8px;background:var(--blanco)}
+.item .h{color:#bbb;cursor:grab;font-size:18px}
+.item .th{width:40px;height:56px;border-radius:8px;background:linear-gradient(160deg,#F3D9E2,#E9C7A6);flex:none}
+.item .d{flex:1}
+.item .d b{font-size:13px}
+.item .d small{display:block;color:var(--gris);font-size:11.5px}
+.item input{width:56px;border:1px solid var(--borde);border-radius:8px;padding:4px 6px;font:inherit;font-size:12px;text-align:center}
+.opciones{display:flex;gap:8px;flex-wrap:wrap}
+.op{padding:8px 14px;border-radius:12px;border:1px solid var(--borde);background:var(--blanco);font-size:13px}
+.op.on{border-color:var(--rosa-fuerte);background:var(--hover);color:var(--rosa-fuerte);font-weight:600}
+.dest{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.dest .op{text-align:center;padding:10px 6px}
+.dest .op small{display:block;font-weight:400;color:var(--gris);font-size:11px}
+.recientes{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.recientes .mini{flex:0 0 120px}
+.msgbox{width:100%;border:1px solid var(--borde);border-radius:12px;padding:10px 12px;font:inherit;min-height:64px;color:#333}
+.big{width:100%;padding:14px;border-radius:14px;font-size:16px;margin-top:8px}
+.turno{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:14px;background:#FFF9EA;border:1px solid #F3E2B3;margin-bottom:8px}
+.turno .n{font-size:30px;font-weight:700;color:#8A6400;font-family:"Poppins";min-width:64px}
+.turno .d b{display:block}
+.turno .d small{color:var(--gris)}
+.pos{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--gris);margin-bottom:12px}
+.perm{display:flex;gap:6px;flex-wrap:wrap}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--blanco);border-top:1px solid var(--borde);display:none;grid-template-columns:repeat(5,1fr);padding:6px 0 10px}
+.tabs a{text-align:center;font-size:10.5px;color:var(--gris)}
+.tabs a .ico{display:block;font-size:20px}
+.tabs a.on{color:var(--rosa-fuerte);font-weight:600}
+.pie-nota{font-size:11.5px;color:var(--gris);margin-top:6px}
+.etq{position:fixed;top:10px;right:10px;background:var(--dorado);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;z-index:9}
+@media (max-width:700px){
+  .app{grid-template-columns:1fr}
+  .lat{display:none}
+  main{padding:14px 14px 90px}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+  .tabs{display:grid}
+  .dos{grid-template-columns:1fr}
+  .cab h1{font-size:19px}
+  .suc{margin-left:0;width:100%;justify-content:center}
+  .acc{flex-wrap:wrap}
+  .oculto-movil{display:none}
+}
+section{display:none}section.on{display:block}
+</style>
+</head>
+<body>
+<span class="etq">PROPUESTA · panel v2 · datos de ejemplo</span>
+<div class="app">
+<aside class="lat">
+  <div class="marca"><div class="logo"></div><div><b>LUMIN TV</b><small>Plaza de la Mujer</small></div></div>
+  <div class="nav">
+    <div class="grupo">Operación</div>
+    <a href="#inicio" data-s="inicio"><span class="ico">⌂</span>Inicio</a>
+    <a href="#pantallas" data-s="pantallas"><span class="ico">▭</span>Pantallas <span class="n">1</span></a>
+    <a href="#mostrar" data-s="mostrar"><span class="ico">▶</span>Mostrar ahora</a>
+    <a href="#turnos" data-s="turnos"><span class="ico">№</span>Turnos</a>
+    <div class="grupo">Contenido</div>
+    <a href="#biblioteca" data-s="biblioteca"><span class="ico">▦</span>Biblioteca</a>
+    <a href="#listas" data-s="listas"><span class="ico">≡</span>Listas</a>
+    <a href="#programacion" data-s="programacion"><span class="ico">◷</span>Programación</a>
+    <a href="#mensajes" data-s="mensajes"><span class="ico">…</span>Mensajes</a>
+    <div class="grupo">Administración</div>
+    <a href="#ajustes" data-s="ajustes"><span class="ico">⚙</span>Usuarios y permisos</a>
+    <a href="#sucursales" data-s="sucursales"><span class="ico">⌖</span>Sucursales</a>
+    <a href="#integraciones" data-s="integraciones"><span class="ico">⇄</span>Integraciones</a>
+  </div>
+  <div class="yo"><b>Adrián</b>administrador · salir</div>
+</aside>
+<main>
+
+<!-- ============================ INICIO ============================ -->
+<section id="inicio">
+  <div class="cab"><h1>Inicio</h1><div class="suc">Plaza de la Mujer ▾</div></div>
+  <div class="tiles">
+    <div class="tile ok"><div class="v">4 / 5</div><div class="l">pantallas en línea</div></div>
+    <div class="tile mal"><div class="v">1</div><div class="l">sin conexión · P3 desde 11:20</div></div>
+    <div class="tile aviso"><div class="v">2</div><div class="l">avisos por atender</div></div>
+    <div class="tile"><div class="v">12:41</div><div class="l">última sincronización</div></div>
+  </div>
+  <div class="card">
+    <h2>Avisos</h2>
+    <div class="aviso err"><div>⚠</div><div><div class="t">P3 · Recepción lleva 1 h 21 min sin conexión</div><div class="q">Sigue reproduciendo desde su cache (6 archivos). Última respuesta 11:20.</div></div></div>
+    <div class="aviso"><div>!</div><div><div class="t">promo-vieja.jpg ya no existe en el servidor y sigue en la lista “Otoño”</div><div class="q">Las pantallas lo saltan. Quítalo de la lista o vuelve a subirlo.</div></div></div>
+  </div>
+  <div class="card">
+    <h2>Pantallas <small>estado real, se actualiza cada 4 s</small></h2>
+    <div class="fila"><div class="num">1</div><div class="info"><b>Entrada</b> <span class="chip aire">Lista al aire</span><div class="det"><span class="pto on"></span> ▶ promo-otono.mp4 · cache 118 MB · app 5.2.61</div></div><div class="acc oculto-movil"><button class="btn ic" title="Pausar">❚❚</button><button class="btn ic" title="Silencio">🔇</button></div></div>
+    <div class="fila"><div class="num">2</div><div class="info"><b>Sala 1</b> <span class="chip">Lista Otoño</span><div class="det"><span class="pto on"></span> ▶ tinte-balayage.mp4 · cache 96 MB · app 5.2.61</div></div><div class="acc oculto-movil"><button class="btn ic">❚❚</button><button class="btn ic">🔇</button></div></div>
+    <div class="fila"><div class="num off">3</div><div class="info"><b>Recepción</b> <span class="chip aire">Lista al aire</span> <span class="chip rosa">turnos</span><div class="det"><span class="pto amb"></span> sin conexión desde 11:20 · ▶ (sin red) manicure.mp4</div></div><div class="acc oculto-movil"><button class="btn">↻ Recargar</button></div></div>
+    <div class="fila"><div class="num">4</div><div class="info"><b>Sala 2</b> <span class="chip aire">Lista al aire</span><div class="det"><span class="pto on"></span> ▶ imagen-promo.jpg · cache 118 MB · app 5.2.61</div></div><div class="acc oculto-movil"><button class="btn ic">❚❚</button><button class="btn ic">🔇</button></div></div>
+    <div class="fila"><div class="num">5</div><div class="info"><b>Caja</b> <span class="chip aire">Lista al aire</span> <span class="chip rosa">turnos</span> <span class="chip">pausada</span><div class="det"><span class="pto on"></span> en pausa desde 12:10 · app 5.1 <span class="chip err">actualizar</span></div></div><div class="acc oculto-movil"><button class="btn ic">▶</button><button class="btn ic">🔇</button></div></div>
+  </div>
+</section>
+
+<!-- ============================ PANTALLAS ============================ -->
+<section id="pantallas">
+  <div class="cab"><h1>Pantallas</h1><div class="suc">Plaza de la Mujer ▾</div></div>
+  <div class="card" style="border-color:#F3E2B3;background:#FFFCF3">
+    <h2>Pendiente de aprobación <small>1 pantalla nueva se está anunciando</small></h2>
+    <div class="fila"><div class="num off">?</div><div class="info"><b>Código en la TV: 483 921</b><div class="det"><span class="pto on"></span> en línea · Roku Express · vista hace 3 s</div></div><div class="acc"><button class="btn p">Aprobar como P6 en…</button><button class="btn">Ignorar</button></div></div>
+  </div>
+  <div class="card">
+    <table>
+      <tr><th>#</th><th>Zona</th><th>Estado</th><th>Lista</th><th>Turnos</th><th>Equipo</th><th></th></tr>
+      <tr><td><span class="num">1</span></td><td><b>Entrada</b></td><td><span class="pto on"></span> en línea · ▶ promo-otono.mp4</td><td><span class="chip aire">Lista al aire</span></td><td><span class="sw"></span></td><td style="color:var(--gris)">Roku Express 4K · 5.2.61 · 192.168.1.50</td><td><div class="acc"><button class="btn ic">❚❚</button><button class="btn ic">🔇</button><button class="btn ic" title="Recargar">↻</button><button class="btn ic" title="Vaciar cache">⌫</button><button class="btn ic">⋯</button></div></td></tr>
+      <tr><td><span class="num">2</span></td><td><b>Sala 1</b></td><td><span class="pto on"></span> en línea · ▶ tinte-balayage.mp4</td><td><span class="chip">Otoño</span></td><td><span class="sw"></span></td><td style="color:var(--gris)">Roku Express 4K · 5.2.61 · 192.168.1.51</td><td><div class="acc"><button class="btn ic">❚❚</button><button class="btn ic">🔇</button><button class="btn ic">↻</button><button class="btn ic">⌫</button><button class="btn ic">⋯</button></div></td></tr>
+      <tr><td><span class="num off">3</span></td><td><b>Recepción</b></td><td><span class="pto amb"></span> sin conexión desde 11:20 · cache</td><td><span class="chip aire">Lista al aire</span></td><td><span class="sw on"></span></td><td style="color:var(--gris)">Roku Express · 5.2.61 · 192.168.1.52</td><td><div class="acc"><button class="btn">↻ Recargar</button><button class="btn ic">⋯</button></div></td></tr>
+      <tr><td><span class="num">4</span></td><td><b>Sala 2</b></td><td><span class="pto on"></span> en línea · ▶ imagen-promo.jpg</td><td><span class="chip aire">Lista al aire</span></td><td><span class="sw"></span></td><td style="color:var(--gris)">Roku Express 4K · 5.2.61 · 192.168.1.53</td><td><div class="acc"><button class="btn ic">❚❚</button><button class="btn ic">🔇</button><button class="btn ic">↻</button><button class="btn ic">⌫</button><button class="btn ic">⋯</button></div></td></tr>
+      <tr><td><span class="num">5</span></td><td><b>Caja</b></td><td><span class="pto on"></span> en pausa desde 12:10</td><td><span class="chip aire">Lista al aire</span></td><td><span class="sw on"></span></td><td style="color:var(--gris)">Roku Express · <span class="chip err">app 5.1</span></td><td><div class="acc"><button class="btn ic">▶</button><button class="btn ic">🔇</button><button class="btn ic">↻</button><button class="btn ic">⌫</button><button class="btn ic">⋯</button></div></td></tr>
+    </table>
+    <div class="pie-nota">El número de pantalla es único por sucursal; “Lista al aire” es la lista base de la sucursal. Mover de sucursal, renombrar zona y eliminar están en ⋯ (solo administrador).</div>
+  </div>
+</section>
+
+<!-- ============================ MOSTRAR AHORA ============================ -->
+<section id="mostrar">
+  <div class="cab"><h1>Mostrar ahora</h1><div class="suc">Plaza de la Mujer ▾</div></div>
+  <div class="card">
+    <h2>¿En qué pantalla?</h2>
+    <div class="dest">
+      <div class="op on">Todas<small>5 pantallas</small></div>
+      <div class="op">P1<small>Entrada</small></div>
+      <div class="op">P2<small>Sala 1</small></div>
+      <div class="op" style="opacity:.5">P3<small>sin red</small></div>
+      <div class="op">P4<small>Sala 2</small></div>
+      <div class="op">P5<small>Caja</small></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>¿Qué mostrar?</h2>
+    <div class="opciones" style="margin-bottom:12px"><div class="op on">Foto o video</div><div class="op">Mensaje de texto</div></div>
+    <div class="recientes">
+      <div class="mini" style="outline:2px solid var(--rosa-fuerte)"><div class="img"><span class="tipo">FOTO</span></div><div class="txt"><b>promo-septiembre.jpg</b><small>usada hace 20 min</small></div></div>
+      <div class="mini"><div class="img"><span class="tipo">VIDEO</span><span class="dur">0:32</span></div><div class="txt"><b>keratina.mp4</b><small>ayer</small></div></div>
+      <div class="mini"><div class="img"><span class="tipo">FOTO</span></div><div class="txt"><b>precios-unas.jpg</b><small>lunes</small></div></div>
+      <div class="mini" style="display:grid;place-items:center;color:var(--gris);border-style:dashed"><div style="text-align:center;padding:20px 8px;font-size:12px">＋<br>Buscar en la biblioteca<br>o tomar foto</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>¿Cuánto tiempo?</h2>
+    <div class="opciones"><div class="op">10 s</div><div class="op on">30 s</div><div class="op">1 min</div><div class="op">Hasta que la quite</div></div>
+    <div class="pie-nota">Después vuelve sola a su lista. “Hasta que la quite” deja un botón Quitar aquí mismo.</div>
+  </div>
+  <button class="btn p big">Mostrar en las 5 pantallas · 30 s</button>
+  <div class="card" style="margin-top:14px">
+    <h2>Ahora mismo <small>lo que está fuera de la lista</small></h2>
+    <div class="fila"><div class="num">4</div><div class="info"><b>Sala 2</b><div class="det">mostrando <b>precios-unas.jpg</b> · fija desde 12:30 · pedida por Karla</div></div><div class="acc"><button class="btn">Quitar</button></div></div>
+  </div>
+</section>
+
+<!-- ============================ TURNOS ============================ -->
+<section id="turnos">
+  <div class="cab"><h1>Turnos</h1><div class="suc">Plaza de la Mujer ▾</div></div>
+  <div class="pos"><span class="pto on"></span> Punto de venta conectado · último turno recibido hace 2 min · 38 hoy</div>
+  <div class="card">
+    <h2>En pantalla ahora</h2>
+    <div class="turno"><div class="n">A-27</div><div class="d"><b>Karla · corte y peinado</b><small>anunciado 12:38 · se muestra en P3 y P5 · quedan 2:10</small></div></div>
+  </div>
+  <div class="card">
+    <h2>Próximos <small>según el punto de venta</small></h2>
+    <div class="fila"><div class="num">28</div><div class="info"><b>A-28</b><div class="det">espera estimada 8 min</div></div></div>
+    <div class="fila"><div class="num">29</div><div class="info"><b>A-29</b><div class="det">espera estimada 15 min</div></div></div>
+  </div>
+  <div class="card">
+    <h2>Anunciar un turno a mano</h2>
+    <div class="opciones" style="margin-bottom:10px"><input class="msgbox" style="min-height:0;width:140px;font-size:22px;text-align:center;font-weight:600" value="A-30"><input class="msgbox" style="min-height:0;flex:1" placeholder="Nombre (opcional)"></div>
+    <div class="opciones"><div class="op">30 s</div><div class="op on">1 min</div><div class="op">3 min</div></div>
+    <button class="btn g big">Anunciar en P3 y P5</button>
+    <div class="pie-nota">Solo las pantallas con “turnos” activado lo muestran. Un turno repetido por error no se anuncia dos veces.</div>
+  </div>
+</section>
+
+<!-- ============================ BIBLIOTECA ============================ -->
+<section id="biblioteca">
+  <div class="cab"><h1>Biblioteca <small style="color:var(--gris);font-weight:400;font-size:14px">· 24 archivos · 1.9 GB</small></h1><div class="suc">Plaza de la Mujer ▾</div></div>
+  <div class="drop">Arrastra videos o fotos aquí, o <b style="color:var(--rosa-fuerte)">elige archivos</b>. Vertical 1080×1920 recomendado · MP4 H.264 o JPG/PNG · hasta 80 MB por archivo (límite de la cache de la TV)</div>
+  <div class="opciones" style="margin-bottom:14px"><div class="op on">Todo</div><div class="op">Videos</div><div class="op">Fotos</div><div class="op">Sin usar en ninguna lista (3)</div><div class="op" style="margin-left:auto">Ordenar: recientes ▾</div></div>
+  <div class="grid">
+    <div class="mini"><div class="img"><span class="tipo">VIDEO</span><span class="dur">0:45</span></div><div class="txt"><b>promo-otono.mp4</b><small>52 MB · en 2 listas · 318 reproducciones</small></div></div>
+    <div class="mini"><div class="img"><span class="tipo">VIDEO</span><span class="dur">0:32</span></div><div class="txt"><b>tinte-balayage.mp4</b><small>41 MB · en 1 lista · 204</small></div></div>
+    <div class="mini"><div class="img"><span class="tipo">FOTO</span><span class="dur">10 s</span></div><div class="txt"><b>imagen-promo.jpg</b><small>1.2 MB · en 3 listas · 510</small></div></div>
+    <div class="mini"><div class="img"><span class="tipo">VIDEO</span><span class="dur">1:10</span></div><div class="txt"><b>keratina.mp4</b><small>68 MB · en 1 lista · 97</small></div></div>
+    <div class="mini"><div class="img"><span class="tipo">FOTO</span><span class="dur">8 s</span></div><div class="txt"><b>precios-unas.jpg</b><small>0.9 MB · sin usar</small></div></div>
+    <div class="mini"><div class="img" style="background:#eee"><span class="tipo" style="background:#FFE9EA;color:#B3262B">FALTA</span></div><div class="txt"><b>promo-vieja.jpg</b><small>no está en el servidor · en lista Otoño</small></div></div>
+    <div class="mini"><div class="img"><span class="tipo">VIDEO</span><span class="dur">0:28</span></div><div class="txt"><b>manicure.mp4</b><small>33 MB · en 1 lista · 260</small></div></div>
+    <div class="mini"><div class="img"><span class="tipo">VIDEO</span><span class="dur">0:15</span><div style="position:absolute;inset:0;background:rgba(255,255,255,.7);display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--rosa-fuerte)">convirtiendo 62 %</div></div><div class="txt"><b>bienvenida.mov</b><small>subido hace 1 min</small></div></div>
+  </div>
+  <div class="pie-nota">Al pasar el cursor: vista previa, duración de la foto, renombrar, eliminar (avisa en qué listas está). Las reproducciones cuentan confirmaciones de la TV, no descargas.</div>
+</section>
+
+<!-- ============================ LISTAS ============================ -->
+<section id="listas">
+  <div class="cab"><h1>Listas</h1><div class="suc">Plaza de la Mujer ▾</div></div>
+  <div class="dos">
+    <div>
+      <div class="lista on"><div class="num" style="background:#FFF4D6;color:#8A6400">★</div><div><b>Lista al aire</b><small>base de la sucursal · 6 elementos · 4:12 · en P1, P3, P4, P5</small></div></div>
+      <div class="lista"><div class="num">2</div><div><b>Otoño</b><small>5 elementos · 3:40 · en P2 · 1 archivo falta</small></div></div>
+      <div class="lista"><div class="num off">3</div><div><b>Navidad 2025</b><small>8 elementos · sin asignar · programada del 1 al 31 dic</small></div></div>
+      <button class="btn" style="width:100%">＋ Nueva lista</button>
+    </div>
+    <div class="card">
+      <h2>Lista al aire <small>lo que ve una pantalla que no tiene lista propia</small><button class="btn" style="margin-left:auto">Probar en P1</button></h2>
+      <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>promo-otono.mp4</b><small>video · 0:45</small></div><span class="chip">girado</span><button class="btn ic peligro">✕</button></div>
+      <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>imagen-promo.jpg</b><small>foto · segundos en pantalla</small></div><input value="10"><button class="btn ic peligro">✕</button></div>
+      <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>tinte-balayage.mp4</b><small>video · 0:32</small></div><button class="btn ic peligro">✕</button></div>
+      <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>manicure.mp4</b><small>video · 0:28</small></div><button class="btn ic peligro">✕</button></div>
+      <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>precios-unas.jpg</b><small>foto</small></div><input value="8"><button class="btn ic peligro">✕</button></div>
+      <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>keratina.mp4</b><small>video · 1:10</small></div><button class="btn ic peligro">✕</button></div>
+      <button class="btn" style="width:100%">＋ Agregar de la biblioteca</button>
+      <div class="pie-nota">Cada pantalla empieza en un punto distinto de la lista para que no vayan todas iguales. Los cambios llegan a las TVs en menos de 10 s; aquí se confirma cuándo cada una la recibió.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PROGRAMACION / MENSAJES (placeholder) ============================ -->
+<section id="programacion"><div class="cab"><h1>Programación</h1></div><div class="card">Se diseña con B7 (horarios y vigencias por lista y por sucursal).</div></section>
+<section id="mensajes"><div class="cab"><h1>Mensajes</h1></div><div class="card">Cintillo inferior: texto, animado o fijo, velocidad. Igual que hoy, con vista previa.</div></section>
+<section id="sucursales"><div class="cab"><h1>Sucursales</h1></div><div class="card">Alta, clave y zona horaria. Igual que hoy.</div></section>
+<section id="integraciones"><div class="cab"><h1>Integraciones</h1></div><div class="card">Estado del punto de venta: últimas llamadas, errores, credencial. Nuevo en B5.</div></section>
+
+<!-- ============================ USUARIOS Y PERMISOS ============================ -->
+<section id="ajustes">
+  <div class="cab"><h1>Usuarios y permisos</h1><button class="btn p" style="margin-left:auto">＋ Invitar</button></div>
+  <div class="card">
+    <table>
+      <tr><th>Usuario</th><th>Rol</th><th>Sucursales que puede operar</th><th>Último acceso</th><th></th></tr>
+      <tr><td><b>Adrián</b><br><small style="color:var(--gris)">adrian@…</small></td><td><span class="chip rosa">administrador</span></td><td><span class="chip">todas</span></td><td>hoy 12:40</td><td><button class="btn ic">⋯</button></td></tr>
+      <tr><td><b>Karla</b><br><small style="color:var(--gris)">recepción</small></td><td><span class="chip">operadora</span></td><td><div class="perm"><span class="chip">Plaza de la Mujer</span></div></td><td>hoy 12:31</td><td><button class="btn ic">⋯</button></td></tr>
+      <tr><td><b>pos-plaza</b><br><small style="color:var(--gris)">punto de venta</small></td><td><span class="chip">integración</span></td><td><div class="perm"><span class="chip">Plaza de la Mujer</span> <span class="chip">solo turnos</span></div></td><td>hace 2 min</td><td><button class="btn ic">⋯</button></td></tr>
+      <tr style="background:#FFF8E6"><td><b>ana</b></td><td><span class="chip">operadora</span></td><td><div class="perm"><span class="chip err">sin sucursales asignadas</span></div><small style="color:#8A6400">Hoy no puede operar ninguna. Asigna al menos una.</small></td><td>nunca</td><td><button class="btn">Asignar</button></td></tr>
+    </table>
+    <div class="pie-nota">Los permisos son explícitos: una lista vacía no da acceso a todo (hoy sí lo da: hallazgo QA-F01). Los cambios se aplican en el servidor, no solo en el panel.</div>
+  </div>
+</section>
+
+</main>
+</div>
+<nav class="tabs">
+  <a href="#inicio" data-s="inicio"><span class="ico">⌂</span>Inicio</a>
+  <a href="#mostrar" data-s="mostrar"><span class="ico">▶</span>Mostrar</a>
+  <a href="#turnos" data-s="turnos"><span class="ico">№</span>Turnos</a>
+  <a href="#pantallas" data-s="pantallas"><span class="ico">▭</span>Pantallas</a>
+  <a href="#biblioteca" data-s="biblioteca"><span class="ico">⋯</span>Más</a>
+</nav>
+<script>
+function ir(){
+  const s=(location.hash||"#inicio").slice(1);
+  document.querySelectorAll("section").forEach(x=>x.classList.toggle("on",x.id===s));
+  document.querySelectorAll("[data-s]").forEach(a=>a.classList.toggle("on",a.dataset.s===s));
+  window.scrollTo(0,0);
+}
+addEventListener("hashchange",ir);ir();
+</script>
+</body>
+</html>
