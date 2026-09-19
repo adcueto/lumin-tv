@@ -95,14 +95,17 @@ def reabrir_entrada_lumin_app(conn) -> None:
 
 
 def _backends_app(cur):
-    """TODAS las conexiones de lumin_app (pid, estado, con transaccion viva)."""
+    """TODAS las conexiones de lumin_app A ESTA BASE (pid, estado, con transaccion
+    viva). Filtrar por datname es obligatorio (informe 24): el mismo rol puede
+    tener sesiones en otras bases del servidor y el drenaje no debe tocarlas."""
     return cur.execute(
         "SELECT pid, state, backend_xid IS NOT NULL OR state LIKE 'idle in transaction%%' OR state = 'active' "
-        "FROM pg_stat_activity WHERE usename = 'lumin_app' AND pid <> pg_backend_pid()").fetchall()
+        "FROM pg_stat_activity WHERE usename = 'lumin_app' AND datname = %s AND pid <> pg_backend_pid()",
+        (BASE,)).fetchall()
 
 
 def drenar_lumin_app(timeout_s: float = 30.0) -> None:
-    """Drenaje rev. 6 (B3-R4-01, segunda vuelta). Contrato:
+    """Drenaje rev. 7 (B3-R4-01, tercera vuelta: acotado a ESTA base). Contrato:
       1. cerrar la entrada (REVOKE CONNECT): ninguna conexion nueva;
       2. gracia: esperar hasta timeout_s a que ninguna conexion de lumin_app
          tenga una transaccion capaz de confirmar (activa, idle in transaction
@@ -487,3 +490,37 @@ def test_drenaje_no_toca_otros_roles(base):
         psycopg.connect(dsn_rol("lumin_migracion"), connect_timeout=2).close()
     finally:
         e.close(); _reabrir()
+
+
+def test_drenaje_no_toca_sesiones_de_lumin_app_en_otras_bases(base):
+    """Informe 24: el mismo rol conectado a OTRA base del servidor sobrevive
+    al drenaje y sigue pudiendo escribir alli."""
+    otra = "lumin_ensayo_otra"
+    with psycopg.connect(dsn_admin_local(), autocommit=True) as adm:
+        adm.execute(f"DROP DATABASE IF EXISTS {otra} WITH (FORCE)")
+        adm.execute(f"CREATE DATABASE {otra} OWNER lumin_migracion")
+        adm.execute(f"GRANT CONNECT ON DATABASE {otra} TO lumin_app")
+    info = psycopg.conninfo.conninfo_to_dict(dsn_rol("lumin_app")); info["dbname"] = otra
+    ajena = psycopg.connect(psycopg.conninfo.make_conninfo(**info))
+    propia = psycopg.connect(dsn_rol("lumin_app"))
+    ajena.execute("CREATE TEMP TABLE t_ajena (n int)"); ajena.commit()   # lumin_app no es dueno de nada: temporal
+    try:
+        drenar_lumin_app(timeout_s=0.1)
+        assert sesiones_app_abiertas() == 0                      # en ESTA base, ninguna
+        ajena.execute("INSERT INTO t_ajena VALUES (1)"); ajena.commit()
+        assert ajena.execute("SELECT count(*) FROM t_ajena").fetchone()[0] == 1, "la sesion de la otra base sigue viva y escribe"
+        with pytest.raises(psycopg.OperationalError):
+            propia.execute("SELECT 1")                          # la de esta base fue terminada
+    finally:
+        try:
+            ajena.close(); propia.close()
+        except Exception:  # noqa: BLE001
+            pass
+        _reabrir()
+        with psycopg.connect(dsn_admin_local(), autocommit=True) as adm:
+            adm.execute(f"DROP DATABASE IF EXISTS {otra} WITH (FORCE)")
+
+
+def dsn_admin_local():
+    from comun import dsn_admin
+    return dsn_admin()

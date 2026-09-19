@@ -1,9 +1,19 @@
-# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 6)
+# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 7)
 
 Para revisión de Adrián y Codex **antes de escribir código**.
-Fecha: 2026-09-17 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 60)
+Fecha: 2026-09-19 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 62)
 
-## Qué cambia en esta revisión 6 (respuesta a `23-qa-B3-rev5-B5a-R2-3a1eaf9.md`)
+## Qué cambia en esta revisión 7 (respuesta a `24-qa-B3-rev6-RF26-a0583df.md`)
+
+Los tres problemas se **CONFIRMAN**. Ensayos: de 50 a **55**.
+
+| Problema de Codex | Decisión | Dónde | Ensayo |
+|---|---|---|---|
+| 1. El drenaje termina sesiones de `lumin_app` en **otras bases** de la misma instancia (la consulta a `pg_stat_activity` filtraba solo por `usename`) | **CONFIRMADO.** La barrera queda acotada a **esta base**: `usename = 'lumin_app' AND datname = <base>`. Es también lo que el `REVOKE CONNECT ON DATABASE` cierra, así que el "cero sesiones" que se verifica y la entrada que se cerró hablan de la misma base. Otras bases de la instancia (otro entorno, otro producto) no se tocan | §7.3 | `test_ensayo_sesiones.py` (19): se crea una segunda base con una conexión `lumin_app` con transacción abierta; el drenaje de `lumin_ensayo` la deja viva y su commit confirma; se conservan los 18 anteriores |
+| 2. Las restricciones de §3.2b permitían relacionar pantallas, grupos y listas de **sucursales distintas** (miembro y destino solo comprobaban `empresa_id`) | **CONFIRMADO.** La sucursal viaja en todas las llaves: `pantalla`, `lista` y `grupo_pantallas` exponen `UNIQUE (id, sucursal_id)`; `grupo_pantalla_miembro` y `lista_destino` llevan `sucursal_id NOT NULL` y sus llaves foráneas son compuestas `(x_id, sucursal_id)`. Un cruce de sucursal viola la FK; mover una pantalla de sucursal la saca en cascada de sus grupos y destinos (la relación pertenece a la sucursal, no viaja con la TV) | §3.2b | `test_ensayo_destinos.py` (4): reproducción con el DDL de la rev. 6 (los tres cruces entran), el DDL de la rev. 7 rechaza los mismos tres y acepta los correctos, mover de sucursal limpia membresías y destinos |
+| 3. Dos listas pueden tener "versión 1": confirmar solo el número no identifica qué lista reproduce la TV | **CONFIRMADO.** La confirmación es el **par** `(lista_id, version)`. Las versiones son un historial append-only (`lista_version`), y la pantalla guarda `lista_conf_id + lista_conf_version` con `CHECK` de par completo y FK al historial: no se puede confirmar una versión que no existió, y una lista puede avanzar sin dejar colgada la confirmación de una versión anterior. Lo mismo para "enviada" y "recibida" (B5b): siempre el par | §3.2b; `22-…md` §5 y §6 | `test_ensayo_destinos.py`: dos listas en versión 1 se distinguen por el par; un par inexistente se rechaza; la lista avanza a 2 y la confirmación de 1 sigue siendo consultable |
+
+## Qué cambió en la revisión 6 (respuesta a `23-qa-B3-rev5-B5a-R2-3a1eaf9.md`)
 
 | Corrección de Codex | Decisión | Dónde | Ensayo |
 |---|---|---|---|
@@ -311,12 +321,22 @@ la columna y la política garantizan que un `SELECT` directo tampoco.
 `ON DELETE CASCADE` en `lista_elemento` reproduce la regla de hoy: borrar un
 archivo lo quita de las listas; borrar una lista **no** borra archivos.
 
-### 3.2b Destinos de lista y grupos de pantallas (RF-26) — contrato, no ensayado
+### 3.2b Destinos de lista y grupos de pantallas (RF-26) — rev. 7, restricciones ensayadas
 
 Detalle y decisiones en `22-rf26-destinos-de-lista.md`. Lo que entra en el
-esquema para no necesitar otra migración cuando B6/B7 lo implementen:
+esquema para no necesitar otra migración cuando B6/B7 lo implementen. La
+regla de la rev. 7: **la sucursal viaja en todas las llaves**. `pantalla`,
+`lista` y `grupo_pantallas` exponen `UNIQUE (id, sucursal_id)`, y las tablas
+de relación referencian ese par, de modo que una pantalla de Juriquilla no
+puede entrar en un grupo de Plaza ni una lista de Plaza asignarse a un
+destino de Juriquilla: el cruce viola la llave foránea, no depende de que la
+aplicación lo compruebe.
 
 ```sql
+-- Requisito previo en las tablas de §3.1/§3.2 (además de UNIQUE (id, empresa_id)):
+ALTER TABLE pantalla ADD UNIQUE (id, sucursal_id);
+ALTER TABLE lista    ADD UNIQUE (id, sucursal_id);
+
 CREATE TABLE grupo_pantallas (                    -- grupo PERSISTENTE, por sucursal
   id           uuid PRIMARY KEY,
   empresa_id   uuid NOT NULL,
@@ -324,20 +344,25 @@ CREATE TABLE grupo_pantallas (                    -- grupo PERSISTENTE, por sucu
   nombre       text NOT NULL,
   UNIQUE (sucursal_id, nombre),
   UNIQUE (id, empresa_id),
+  UNIQUE (id, sucursal_id),
   FOREIGN KEY (sucursal_id, empresa_id) REFERENCES sucursal(id, empresa_id) ON DELETE CASCADE
 );
 CREATE TABLE grupo_pantalla_miembro (
   grupo_id     uuid NOT NULL,
   pantalla_id  uuid NOT NULL,
+  sucursal_id  uuid NOT NULL,                       -- la de AMBOS: lo garantizan las dos FK compuestas
   empresa_id   uuid NOT NULL,
   PRIMARY KEY (grupo_id, pantalla_id),
-  FOREIGN KEY (grupo_id,    empresa_id) REFERENCES grupo_pantallas(id, empresa_id) ON DELETE CASCADE,
-  FOREIGN KEY (pantalla_id, empresa_id) REFERENCES pantalla(id, empresa_id)        ON DELETE CASCADE
+  FOREIGN KEY (grupo_id,    sucursal_id) REFERENCES grupo_pantallas(id, sucursal_id) ON DELETE CASCADE,
+  FOREIGN KEY (pantalla_id, sucursal_id) REFERENCES pantalla(id, sucursal_id)        ON DELETE CASCADE,
+  FOREIGN KEY (sucursal_id, empresa_id)  REFERENCES sucursal(id, empresa_id)
 );
--- Asignacion de una lista a un destino. Un destino es UNA pantalla o UN grupo.
+-- Asignacion de una lista a un destino. Un destino es UNA pantalla o UN grupo,
+-- y lista y destino son de la MISMA sucursal.
 CREATE TABLE lista_destino (
   id           uuid PRIMARY KEY,
   empresa_id   uuid NOT NULL,
+  sucursal_id  uuid NOT NULL,
   lista_id     uuid NOT NULL,
   pantalla_id  uuid,                                -- exactamente uno de los dos
   grupo_id     uuid,
@@ -345,18 +370,47 @@ CREATE TABLE lista_destino (
   asignado_por uuid, asignado_en timestamptz NOT NULL DEFAULT now(),
   CHECK ((pantalla_id IS NULL) <> (grupo_id IS NULL)),
   UNIQUE (id, empresa_id),
-  FOREIGN KEY (lista_id,    empresa_id) REFERENCES lista(id, empresa_id)           ON DELETE CASCADE,
-  FOREIGN KEY (pantalla_id, empresa_id) REFERENCES pantalla(id, empresa_id)        ON DELETE CASCADE,
-  FOREIGN KEY (grupo_id,    empresa_id) REFERENCES grupo_pantallas(id, empresa_id) ON DELETE CASCADE
+  FOREIGN KEY (lista_id,    sucursal_id) REFERENCES lista(id, sucursal_id)           ON DELETE CASCADE,
+  FOREIGN KEY (pantalla_id, sucursal_id) REFERENCES pantalla(id, sucursal_id)        ON DELETE CASCADE,
+  FOREIGN KEY (grupo_id,    sucursal_id) REFERENCES grupo_pantallas(id, sucursal_id) ON DELETE CASCADE,
+  FOREIGN KEY (sucursal_id, empresa_id)  REFERENCES sucursal(id, empresa_id)
 );
 CREATE UNIQUE INDEX un_destino_por_pantalla ON lista_destino (pantalla_id) WHERE pantalla_id IS NOT NULL;
 CREATE UNIQUE INDEX una_lista_por_grupo     ON lista_destino (grupo_id)    WHERE grupo_id IS NOT NULL;
--- Entrega por pantalla: que version de lista le corresponde, cual pidio y cual confirmo
-ALTER TABLE lista    ADD COLUMN version int NOT NULL DEFAULT 1;   -- +1 en cada cambio de elementos/orden
-ALTER TABLE pantalla ADD COLUMN lista_version_enviada   int,       -- la que el servidor le sirvio por ultima vez
-                     ADD COLUMN lista_version_recibida  int,       -- la que la TV declaro en su latido (B5b)
-                     ADD COLUMN lista_version_reprod    int;       -- la que la TV confirmo reproduciendo (propuesta 7)
+
+-- Entrega por pantalla. La identidad de lo entregado es el PAR (lista, version):
+-- dos listas distintas pueden ir ambas por la "version 1". Las versiones son un
+-- historial append-only: la lista avanza sin dejar colgadas confirmaciones viejas.
+ALTER TABLE lista ADD COLUMN version int NOT NULL DEFAULT 1;      -- +1 en cada cambio de elementos/orden
+CREATE TABLE lista_version (
+  lista_id   uuid NOT NULL REFERENCES lista(id) ON DELETE CASCADE,
+  version    int  NOT NULL,
+  creada_en  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (lista_id, version)                                -- se inserta al crear la lista y en cada +1
+);
+ALTER TABLE pantalla
+  ADD COLUMN lista_env_id  uuid, ADD COLUMN lista_env_version  int,  -- la que el servidor le sirvio por ultima vez
+  ADD COLUMN lista_rec_id  uuid, ADD COLUMN lista_rec_version  int,  -- la que la TV declaro en su latido (B5b)
+  ADD COLUMN lista_conf_id uuid, ADD COLUMN lista_conf_version int,  -- la que la TV confirmo reproduciendo (propuesta 7)
+  ADD CONSTRAINT env_par  CHECK ((lista_env_id  IS NULL) = (lista_env_version  IS NULL)),
+  ADD CONSTRAINT rec_par  CHECK ((lista_rec_id  IS NULL) = (lista_rec_version  IS NULL)),
+  ADD CONSTRAINT conf_par CHECK ((lista_conf_id IS NULL) = (lista_conf_version IS NULL)),
+  ADD FOREIGN KEY (lista_env_id,  lista_env_version)  REFERENCES lista_version(lista_id, version) ON DELETE SET NULL,
+  ADD FOREIGN KEY (lista_rec_id,  lista_rec_version)  REFERENCES lista_version(lista_id, version) ON DELETE SET NULL,
+  ADD FOREIGN KEY (lista_conf_id, lista_conf_version) REFERENCES lista_version(lista_id, version) ON DELETE SET NULL;
 ```
+
+Consecuencias que el ensayo comprueba (`test_ensayo_destinos.py`): con el DDL
+de la rev. 6 los tres cruces de sucursal entraban; con este los tres fallan
+con violación de llave foránea y las relaciones correctas entran; **mover una
+pantalla de sucursal** la saca en cascada de sus grupos y destinos (la
+relación pertenece a la sucursal, no viaja con la TV; el panel debe avisarlo
+al mover); dos listas en versión 1 se distinguen por el par; un par que la
+lista nunca tuvo se rechaza; "enviada (lista, 2), recibida (lista, 1)" es
+una diferencia visible. Se ensaya con `pantalla_e`/`lista_e` mínimas porque
+el esquema completo de §3 no existe todavía; las columnas `lista_env_*` y
+`lista_rec_*` siguen el mismo patrón que `lista_conf_*` (ensayado) y son
+contrato.
 
 Resolución de la lista efectiva de una pantalla, **determinista y en este
 orden**: (1) asignación directa a la pantalla (`un_destino_por_pantalla`
@@ -364,9 +418,10 @@ impide dos); (2) si no hay, la asignación de grupo con **mayor `prioridad`**
 entre los grupos a los que pertenece, y a igual prioridad la **más
 reciente** (`asignado_en`); (3) si no hay, la lista programada vigente (B7);
 (4) la lista al aire de la sucursal. Todas las tablas nuevas llevan
-`empresa_id` con la política estándar de §3.5 (contrato). El resto —qué se
-confirma al reemplazar, qué pasa al borrar un grupo, qué significa cada
-estado de entrega— está en el documento 22.
+`empresa_id` con la política estándar de §3.5 (contrato; el aislamiento por
+sucursal lo dan las llaves de arriba, la política RLS sigue siendo por
+empresa). El resto —qué se confirma al reemplazar, qué pasa al borrar un
+grupo, qué significa cada estado de entrega— está en el documento 22.
 
 ### 3.3 Operación
 
@@ -534,6 +589,7 @@ propietario.
 | `espejo_marca` | **solo `INSERT`** | `FOR INSERT WITH CHECK (true)` — la marca no lleva datos | `SELECT` `USING (true)` y `UPDATE (procesada_en)` `USING (true) WITH CHECK (true)` | todo | **Ensayado** |
 | `espejo_estado` | ninguno | ninguna | `SELECT, UPDATE`, `FOR ALL USING (true) WITH CHECK (true)` | todo | **Ensayado** |
 | `migracion_json` | ninguno | ninguna | `SELECT` | todo | Contrato |
+| `grupo_pantallas`, `grupo_pantalla_miembro`, `lista_destino`, `lista_version` (§3.2b) | `SELECT, INSERT, UPDATE, DELETE` (`lista_version`: sin `UPDATE`/`DELETE`) | mismo patrón que `sucursal`; `lista_version` vía `lista_id` | `SELECT`, `USING (true)` | todo | Política: contrato. **Restricciones de sucursal y par de versión: ensayadas** (`test_ensayo_destinos.py`, sin RLS) |
 | Roles y cluster | `lumin_migracion` es miembro de `pg_signal_backend` y `pg_read_all_stats` (drenaje de §7.3); nadie tiene `SUPERUSER`, `BYPASSRLS` ni `CREATEROLE` | | | | **Ensayado** |
 
 Notas ensayadas: las columnas `GENERATED … AS IDENTITY` de `auditoria` y
@@ -803,27 +859,31 @@ T+30 días Se archivan los JSON congelados (no se borran).
 
 Si algo falla en los pasos 3–5, la reversión es inmediata **pero pasa por el
 mismo guardián** que cualquier otra (rev. 4, B3-R3-02): `revertir.py` pone solo
-lectura y **drena** `lumin_app` con el contrato de la rev. 6 (B3-R4-01, dos
-vueltas):
+lectura y **drena** `lumin_app` con el contrato de la rev. 7 (B3-R4-01, tres
+vueltas). Todo el drenaje está acotado a **esta base**: cada consulta a
+`pg_stat_activity` filtra `usename = 'lumin_app' AND datname = '<base>'`
+(informe 24, problema 1), que es exactamente el alcance del `REVOKE CONNECT
+ON DATABASE`; sesiones del mismo rol en otras bases de la instancia no se
+terminan ni se cuentan.
 
 1. **Entrada cerrada:** `REVOKE CONNECT ON DATABASE lumin FROM lumin_app`. La
    base no concede `CONNECT` a `PUBLIC`, solo a los tres roles, así que el
-   `REVOKE` es efectivo. Ninguna conexión nueva de la aplicación.
+   `REVOKE` es efectivo. Ninguna conexión nueva de la aplicación a esta base.
 2. **Gracia:** hasta 30 s para que las transacciones en vuelo (`active`,
    `idle in transaction`, `backend_xid` no nulo) terminen por sí solas. Es
    cortesía con lo que estaba a medias; **no es la barrera**.
-3. **Barrera:** `pg_terminate_backend` a **todas** las sesiones de `lumin_app`,
-   incluidas las `idle`. Una conexión de pool ya abierta no necesita `CONNECT`
-   para iniciar una transacción nueva (Codex lo reprodujo sobre la rev. 5);
-   por eso no basta con matar las que tienen transacción. Una sesión terminada
-   hace rollback, nunca commit. `lumin_migracion` es miembro de
-   `pg_signal_backend` y `pg_read_all_stats` para poder hacerlo; espejo y
-   migración no se tocan.
-4. **Verificación:** cero sesiones de `lumin_app` en `pg_stat_activity`. Con
-   la entrada cerrada, cero ahora es cero hasta que se reabra: ningún hilo
-   HTTP, trabajador ni conexión de pool puede empezar SQL después. Si queda
-   alguna, `DrenajeIncompleto` y la reversión se **bloquea**, también la de
-   emergencia.
+3. **Barrera:** `pg_terminate_backend` a **todas** las sesiones de `lumin_app`
+   **en esta base**, incluidas las `idle`. Una conexión de pool ya abierta no
+   necesita `CONNECT` para iniciar una transacción nueva (Codex lo reprodujo
+   sobre la rev. 5); por eso no basta con matar las que tienen transacción.
+   Una sesión terminada hace rollback, nunca commit. `lumin_migracion` es
+   miembro de `pg_signal_backend` y `pg_read_all_stats` para poder hacerlo;
+   espejo, migración y otras bases no se tocan.
+4. **Verificación:** cero sesiones de `lumin_app` en `pg_stat_activity` **para
+   esta base**. Con la entrada cerrada, cero ahora es cero hasta que se reabra:
+   ningún hilo HTTP, trabajador ni conexión de pool puede empezar SQL después.
+   Si queda alguna, `DrenajeIncompleto` y la reversión se **bloquea**, también
+   la de emergencia.
 
 Del lado del servidor 6.11 esto se ve como errores de conexión en las
 peticiones que estaban en curso, que responden 503; el modo solo lectura HTTP
@@ -1215,7 +1275,7 @@ respaldo sí, adaptado a `pg_dump` (§7.5).
 ## 13. Lo que pido para cerrar la revisión
 
 - Las siete decisiones de §9 (D7 es nueva en esta revisión).
-- Que Codex repita los 50 ensayos de `servidor/ensayos_b3/` en su entorno
+- Que Codex repita los 55 ensayos de `servidor/ensayos_b3/` en su entorno
   (necesitan un PostgreSQL 16 de ensayo y `psycopg` 3; el README dice cómo).
   Son la evidencia de B3-R2-01/02/03; sin repetirlos, cuentan como evidencia
   aportada por Claude.
