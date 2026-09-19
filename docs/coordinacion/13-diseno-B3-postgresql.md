@@ -1,16 +1,28 @@
-# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 7)
+# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 8)
 
 Para revisión de Adrián y Codex **antes de escribir código**.
 Fecha: 2026-09-19 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 62)
 
-## Qué cambia en esta revisión 7 (respuesta a `24-qa-B3-rev6-RF26-a0583df.md`)
+## Qué cambia en esta revisión 8 (respuesta al informe 25 sobre `050cc2d`)
+
+Codex cierra el drenaje acotado a la base (B3-R4-01) y los cruces de sucursal
+(RF26-QA-01). Las tres correcciones que quedan —RF26-QA-02, RF26-QA-03 y
+DOC-R7-01— se **CONFIRMAN**. Ensayos: de 55 a **61**.
+
+| Corrección de Codex | Decisión | Dónde | Ensayo |
+|---|---|---|---|
+| RF26-QA-02 [P1] El par `(lista, version)` distingue listas distintas, pero no dos asignaciones sucesivas de la **misma** lista (L1 → L2 → L1): una confirmación de la primera asignación parece "al día" en la tercera | **CONFIRMADO.** Lo que se confirma no es un contenido sino una **entrega**: cada vez que el servidor sirve `(lista, version)` a una pantalla inserta una fila en `pantalla_entrega` con número **consecutivo por pantalla**; la respuesta lleva ese número, la TV lo devuelve en el latido y en la confirmación, y `pantalla.entrega_env / entrega_rec / entrega_conf` guardan números de entrega con FK a la tabla. "Al día" es `entrega_conf = entrega_env`. Confirmar es **monótono** (`UPDATE … WHERE entrega_conf IS NULL OR entrega_conf < n`): una confirmación atrasada no retrocede nada, y una entrega que la pantalla nunca recibió viola la FK. El par sigue disponible para el panel por la fila de la entrega | §3.2b; `22-…md` §5 | `test_ensayo_destinos.py`: reproducción del L1 → L2 → L1 con el esquema de la rev. 7 ("al día" falso); con la rev. 8, el contraejemplo de Codex tal cual (confirma L1, reproduce L2, se reasigna L1, llega la confirmación atrasada de la primera L1: 0 filas, no "al día"), duplicados y desordenados (0 filas), inexistente (FK), reconexión (la TV vuelve declarando la entrega 3 con la 4 enviada: el panel ve 4/3/3; un latido viejo no retrocede), numeración independiente por pantalla |
+| RF26-QA-03 [P1] `lista_version` sin `empresa_id`: el SQL admite que una pantalla confirme una versión de una lista de **otra empresa** (RLS no interviene en la comprobación de llaves foráneas) | **CONFIRMADO.** `lista_version` lleva `empresa_id` con FK `(lista_id, empresa_id) → lista` y `UNIQUE (lista_id, version, empresa_id)`; `pantalla_entrega` lleva `empresa_id` y referencia `pantalla(id, empresa_id)` **y** `lista_version(lista_id, version, empresa_id)`, así que pantalla y lista son de la misma empresa por construcción, diga lo que diga el `empresa_id` que escriba la aplicación | §3.2b, §3.5 | reproducción con la rev. 7 (la pantalla de A confirma la lista de B); con la rev. 8 y como propietario: versión con empresa equivocada y entrega cruzada fallan por FK. **Como `lumin_app`, con las políticas escritas en el DDL del ensayo:** sin contexto no ve ni inserta historial ni entregas; con empresa A no ve el historial de B, no puede insertar en él (política) ni mintiendo la empresa (FK), la entrega cruzada falla por los dos caminos, la confirmación sobre una pantalla de B toca 0 filas; positivo: su lista avanza a v2 y el historial v1 sigue legible y referenciado |
+| DOC-R7-01 [P2] Precisión documental: mover una pantalla de sucursal **no** limpia relaciones en cascada; la base rechaza el movimiento hasta que se limpien explícitamente | **CONFIRMADO.** Es lo que el ensayo ya demostraba y el texto de la rev. 7 decía mal. Corregido en §3.2b y en el documento 22 (§2 y §6): el `UPDATE` de `sucursal_id` falla mientras queden miembros o destinos; "mover" es **una transacción** del servidor que borra miembros y destinos y luego mueve, y el panel lo avisa antes. El esquema impide hacerlo a medias; no lo hace por uno | §3.2b; `22-…md` §2, §6 | `test_mover_pantalla_de_sucursal_exige_limpiar_grupos_y_destinos`: rechazo con miembro, rechazo con destino, transacción correcta; `test_mover_pantalla_es_una_transaccion_que_revierte_entera`: fallo intermedio (sucursal de otra empresa) deja relaciones y sucursal intactas. No se usa `ON UPDATE CASCADE`, que no significa borrar los vínculos de la sucursal anterior |
+
+## Qué cambió en la revisión 7 (respuesta a `24-qa-B3-rev6-RF26-a0583df.md`)
 
 Los tres problemas se **CONFIRMAN**. Ensayos: de 50 a **55**.
 
 | Problema de Codex | Decisión | Dónde | Ensayo |
 |---|---|---|---|
 | 1. El drenaje termina sesiones de `lumin_app` en **otras bases** de la misma instancia (la consulta a `pg_stat_activity` filtraba solo por `usename`) | **CONFIRMADO.** La barrera queda acotada a **esta base**: `usename = 'lumin_app' AND datname = <base>`. Es también lo que el `REVOKE CONNECT ON DATABASE` cierra, así que el "cero sesiones" que se verifica y la entrada que se cerró hablan de la misma base. Otras bases de la instancia (otro entorno, otro producto) no se tocan | §7.3 | `test_ensayo_sesiones.py` (19): se crea una segunda base con una conexión `lumin_app` con transacción abierta; el drenaje de `lumin_ensayo` la deja viva y su commit confirma; se conservan los 18 anteriores |
-| 2. Las restricciones de §3.2b permitían relacionar pantallas, grupos y listas de **sucursales distintas** (miembro y destino solo comprobaban `empresa_id`) | **CONFIRMADO.** La sucursal viaja en todas las llaves: `pantalla`, `lista` y `grupo_pantallas` exponen `UNIQUE (id, sucursal_id)`; `grupo_pantalla_miembro` y `lista_destino` llevan `sucursal_id NOT NULL` y sus llaves foráneas son compuestas `(x_id, sucursal_id)`. Un cruce de sucursal viola la FK; mover una pantalla de sucursal la saca en cascada de sus grupos y destinos (la relación pertenece a la sucursal, no viaja con la TV) | §3.2b | `test_ensayo_destinos.py` (4): reproducción con el DDL de la rev. 6 (los tres cruces entran), el DDL de la rev. 7 rechaza los mismos tres y acepta los correctos, mover de sucursal limpia membresías y destinos |
+| 2. Las restricciones de §3.2b permitían relacionar pantallas, grupos y listas de **sucursales distintas** (miembro y destino solo comprobaban `empresa_id`) | **CONFIRMADO.** La sucursal viaja en todas las llaves: `pantalla`, `lista` y `grupo_pantallas` exponen `UNIQUE (id, sucursal_id)`; `grupo_pantalla_miembro` y `lista_destino` llevan `sucursal_id NOT NULL` y sus llaves foráneas son compuestas `(x_id, sucursal_id)`. Un cruce de sucursal viola la FK; mover una pantalla de sucursal exige antes quitarla de sus grupos y destinos (la relación pertenece a la sucursal, no viaja con la TV; *la rev. 7 decía "en cascada", corregido en la rev. 8: la base rechaza el movimiento, no limpia*) | §3.2b | `test_ensayo_destinos.py` (4): reproducción con el DDL de la rev. 6 (los tres cruces entran), el DDL de la rev. 7 rechaza los mismos tres y acepta los correctos, mover de sucursal exige limpiar membresías y destinos |
 | 3. Dos listas pueden tener "versión 1": confirmar solo el número no identifica qué lista reproduce la TV | **CONFIRMADO.** La confirmación es el **par** `(lista_id, version)`. Las versiones son un historial append-only (`lista_version`), y la pantalla guarda `lista_conf_id + lista_conf_version` con `CHECK` de par completo y FK al historial: no se puede confirmar una versión que no existió, y una lista puede avanzar sin dejar colgada la confirmación de una versión anterior. Lo mismo para "enviada" y "recibida" (B5b): siempre el par | §3.2b; `22-…md` §5 y §6 | `test_ensayo_destinos.py`: dos listas en versión 1 se distinguen por el par; un par inexistente se rechaza; la lista avanza a 2 y la confirmación de 1 sigue siendo consultable |
 
 ## Qué cambió en la revisión 6 (respuesta a `23-qa-B3-rev5-B5a-R2-3a1eaf9.md`)
@@ -321,7 +333,7 @@ la columna y la política garantizan que un `SELECT` directo tampoco.
 `ON DELETE CASCADE` en `lista_elemento` reproduce la regla de hoy: borrar un
 archivo lo quita de las listas; borrar una lista **no** borra archivos.
 
-### 3.2b Destinos de lista y grupos de pantallas (RF-26) — rev. 7, restricciones ensayadas
+### 3.2b Destinos de lista y grupos de pantallas (RF-26) — rev. 8, restricciones ensayadas
 
 Detalle y decisiones en `22-rf26-destinos-de-lista.md`. Lo que entra en el
 esquema para no necesitar otra migración cuando B6/B7 lo implementen. La
@@ -378,45 +390,88 @@ CREATE TABLE lista_destino (
 CREATE UNIQUE INDEX un_destino_por_pantalla ON lista_destino (pantalla_id) WHERE pantalla_id IS NOT NULL;
 CREATE UNIQUE INDEX una_lista_por_grupo     ON lista_destino (grupo_id)    WHERE grupo_id IS NOT NULL;
 
--- Entrega por pantalla. La identidad de lo entregado es el PAR (lista, version):
--- dos listas distintas pueden ir ambas por la "version 1". Las versiones son un
--- historial append-only: la lista avanza sin dejar colgadas confirmaciones viejas.
+-- Historial de versiones, POR EMPRESA (informe 25, problema 2). Append-only: cada +1
+-- inserta una fila; nunca se borra ni se reescribe mientras exista la lista.
 ALTER TABLE lista ADD COLUMN version int NOT NULL DEFAULT 1;      -- +1 en cada cambio de elementos/orden
 CREATE TABLE lista_version (
-  lista_id   uuid NOT NULL REFERENCES lista(id) ON DELETE CASCADE,
+  lista_id   uuid NOT NULL,
   version    int  NOT NULL,
+  empresa_id uuid NOT NULL,
   creada_en  timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (lista_id, version)                                -- se inserta al crear la lista y en cada +1
+  PRIMARY KEY (lista_id, version),
+  UNIQUE (lista_id, version, empresa_id),
+  FOREIGN KEY (lista_id, empresa_id) REFERENCES lista(id, empresa_id) ON DELETE CASCADE
+);
+-- ENTREGA (informe 25, problema 1). Lo que se confirma no es un contenido sino una
+-- entrega: cada vez que el servidor sirve (lista, version) a una pantalla inserta una
+-- fila con numero consecutivo POR PANTALLA. La respuesta lleva el numero; la TV lo
+-- devuelve en el latido (recibida) y en la confirmacion (reproduciendo). Dos listas
+-- con "version 1" y dos asignaciones sucesivas de la misma lista son entregas distintas.
+CREATE TABLE pantalla_entrega (
+  pantalla_id uuid   NOT NULL,
+  seq         bigint NOT NULL,                                     -- 1, 2, 3… por pantalla
+  empresa_id  uuid   NOT NULL,
+  lista_id    uuid   NOT NULL,
+  version     int    NOT NULL,
+  enviada_en  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (pantalla_id, seq),
+  FOREIGN KEY (pantalla_id, empresa_id)       REFERENCES pantalla(id, empresa_id)                     ON DELETE CASCADE,
+  FOREIGN KEY (lista_id, version, empresa_id) REFERENCES lista_version(lista_id, version, empresa_id) ON DELETE CASCADE
 );
 ALTER TABLE pantalla
-  ADD COLUMN lista_env_id  uuid, ADD COLUMN lista_env_version  int,  -- la que el servidor le sirvio por ultima vez
-  ADD COLUMN lista_rec_id  uuid, ADD COLUMN lista_rec_version  int,  -- la que la TV declaro en su latido (B5b)
-  ADD COLUMN lista_conf_id uuid, ADD COLUMN lista_conf_version int,  -- la que la TV confirmo reproduciendo (propuesta 7)
-  ADD CONSTRAINT env_par  CHECK ((lista_env_id  IS NULL) = (lista_env_version  IS NULL)),
-  ADD CONSTRAINT rec_par  CHECK ((lista_rec_id  IS NULL) = (lista_rec_version  IS NULL)),
-  ADD CONSTRAINT conf_par CHECK ((lista_conf_id IS NULL) = (lista_conf_version IS NULL)),
-  ADD FOREIGN KEY (lista_env_id,  lista_env_version)  REFERENCES lista_version(lista_id, version) ON DELETE SET NULL,
-  ADD FOREIGN KEY (lista_rec_id,  lista_rec_version)  REFERENCES lista_version(lista_id, version) ON DELETE SET NULL,
-  ADD FOREIGN KEY (lista_conf_id, lista_conf_version) REFERENCES lista_version(lista_id, version) ON DELETE SET NULL;
+  ADD COLUMN entrega_env  bigint,   -- ultima entrega servida
+  ADD COLUMN entrega_rec  bigint,   -- ultima que la TV declaro aplicada en su latido (B5b)
+  ADD COLUMN entrega_conf bigint,   -- ultima que la TV confirmo reproduciendo (propuesta 7)
+  ADD FOREIGN KEY (id, entrega_env)  REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL,
+  ADD FOREIGN KEY (id, entrega_rec)  REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL,
+  ADD FOREIGN KEY (id, entrega_conf) REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL;
 ```
 
-Consecuencias que el ensayo comprueba (`test_ensayo_destinos.py`): con el DDL
-de la rev. 6 los tres cruces de sucursal entraban; con este los tres fallan
-con violación de llave foránea y las relaciones correctas entran; **mover una
-pantalla de sucursal** la saca en cascada de sus grupos y destinos (la
-relación pertenece a la sucursal, no viaja con la TV; el panel debe avisarlo
-al mover); dos listas en versión 1 se distinguen por el par; un par que la
-lista nunca tuvo se rechaza; "enviada (lista, 2), recibida (lista, 1)" es
-una diferencia visible. Se ensaya con `pantalla_e`/`lista_e` mínimas porque
-el esquema completo de §3 no existe todavía; las columnas `lista_env_*` y
-`lista_rec_*` siguen el mismo patrón que `lista_conf_*` (ensayado) y son
-contrato.
+SQL del servidor, ensayado tal cual:
+
+```sql
+-- Servir una lista a una pantalla = crear la entrega y apuntar entrega_env a ella
+WITH n AS (SELECT coalesce(max(seq), 0) + 1 AS seq FROM pantalla_entrega WHERE pantalla_id = :p),
+     e AS (INSERT INTO pantalla_entrega (pantalla_id, seq, empresa_id, lista_id, version)
+           SELECT :p, n.seq, :empresa, :lista, :version FROM n RETURNING seq)
+UPDATE pantalla SET entrega_env = e.seq FROM e WHERE pantalla.id = :p RETURNING e.seq;
+-- Confirmar es monotono: una confirmacion atrasada no toca nada (0 filas); una entrega
+-- que la pantalla nunca recibio viola la FK. Igual para entrega_rec.
+UPDATE pantalla SET entrega_conf = :seq
+ WHERE id = :p AND (entrega_conf IS NULL OR entrega_conf < :seq);
+-- "Al dia"
+SELECT entrega_conf IS NOT NULL AND entrega_conf = entrega_env FROM pantalla WHERE id = :p;
+```
+
+Consecuencias que el ensayo comprueba (`test_ensayo_destinos.py`, 10): con el
+DDL de la rev. 6 los tres cruces de sucursal entraban; con el de la rev. 7 y
+posteriores los tres fallan con violación de llave foránea y las relaciones
+correctas entran. **Mover una pantalla de sucursal no limpia nada en cascada**
+(precisión del informe 25): el `UPDATE` de `sucursal_id` es rechazado mientras
+queden miembros o destinos de la sucursal vieja; "mover" es una transacción
+del servidor que borra miembros y destinos y luego mueve, y el panel lo avisa
+en el cuadro de "Mover a…". Con el esquema de la rev. 7, L1 → L2 → L1 daba
+"al día" con una confirmación de la primera asignación, y una pantalla de la
+empresa A podía confirmar una lista de la empresa B; con el de la rev. 8 la
+entrega 3 no se da por confirmada con la 1, la confirmación atrasada devuelve
+0 filas, la entrega inexistente falla, cada pantalla numera por su cuenta, y
+la versión o la entrega con empresa cruzada fallan por FK sea cual sea el
+`empresa_id` que escriba la aplicación. El historial y las entregas llevan
+RLS **en el DDL del ensayo** (política estándar por empresa, `GRANT SELECT,
+INSERT` a `lumin_app`: append-only) y se ejercen con el rol real: sin
+contexto, empresa equivocada, consulta directa al historial, confirmación
+cruzada y el positivo del historial antiguo legítimo. Se ensaya con
+`pantalla_e`/`lista_e` mínimas porque el esquema completo de §3 no existe
+todavía.
 
 Resolución de la lista efectiva de una pantalla, **determinista y en este
 orden**: (1) asignación directa a la pantalla (`un_destino_por_pantalla`
 impide dos); (2) si no hay, la asignación de grupo con **mayor `prioridad`**
-entre los grupos a los que pertenece, y a igual prioridad la **más
-reciente** (`asignado_en`); (3) si no hay, la lista programada vigente (B7);
+entre los grupos a los que pertenece, a igual prioridad la **más
+reciente** (`asignado_en`) y, si aun así empatan, la de menor `grupo_id`
+(orden total `prioridad DESC, asignado_en DESC, grupo_id ASC`; el empate de
+prioridad se muestra como conflicto en el panel); (3) si no hay, la lista
+programada vigente (B7);
 (4) la lista al aire de la sucursal. Todas las tablas nuevas llevan
 `empresa_id` con la política estándar de §3.5 (contrato; el aislamiento por
 sucursal lo dan las llaves de arriba, la política RLS sigue siendo por
@@ -589,7 +644,7 @@ propietario.
 | `espejo_marca` | **solo `INSERT`** | `FOR INSERT WITH CHECK (true)` — la marca no lleva datos | `SELECT` `USING (true)` y `UPDATE (procesada_en)` `USING (true) WITH CHECK (true)` | todo | **Ensayado** |
 | `espejo_estado` | ninguno | ninguna | `SELECT, UPDATE`, `FOR ALL USING (true) WITH CHECK (true)` | todo | **Ensayado** |
 | `migracion_json` | ninguno | ninguna | `SELECT` | todo | Contrato |
-| `grupo_pantallas`, `grupo_pantalla_miembro`, `lista_destino`, `lista_version` (§3.2b) | `SELECT, INSERT, UPDATE, DELETE` (`lista_version`: sin `UPDATE`/`DELETE`) | mismo patrón que `sucursal`; `lista_version` vía `lista_id` | `SELECT`, `USING (true)` | todo | Política: contrato. **Restricciones de sucursal y par de versión: ensayadas** (`test_ensayo_destinos.py`, sin RLS) |
+| `grupo_pantallas`, `grupo_pantalla_miembro`, `lista_destino`, `lista_version`, `pantalla_entrega` (§3.2b) | `SELECT, INSERT, UPDATE, DELETE` (`lista_version` y `pantalla_entrega`: solo `SELECT, INSERT`) | mismo patrón que `sucursal` (todas llevan `empresa_id`) | `SELECT`, `USING (true)` | todo | Grupos y destinos: política contrato, restricciones de sucursal **ensayadas**. `lista_version` y `pantalla_entrega`: **política y restricciones ensayadas** con `lumin_app` (`test_ensayo_destinos.py`); las FK compuestas dan la empresa aunque RLS no intervenga en su comprobación (informe 25) |
 | Roles y cluster | `lumin_migracion` es miembro de `pg_signal_backend` y `pg_read_all_stats` (drenaje de §7.3); nadie tiene `SUPERUSER`, `BYPASSRLS` ni `CREATEROLE` | | | | **Ensayado** |
 
 Notas ensayadas: las columnas `GENERATED … AS IDENTITY` de `auditoria` y
@@ -1275,7 +1330,7 @@ respaldo sí, adaptado a `pg_dump` (§7.5).
 ## 13. Lo que pido para cerrar la revisión
 
 - Las siete decisiones de §9 (D7 es nueva en esta revisión).
-- Que Codex repita los 55 ensayos de `servidor/ensayos_b3/` en su entorno
+- Que Codex repita los 61 ensayos de `servidor/ensayos_b3/` en su entorno
   (necesitan un PostgreSQL 16 de ensayo y `psycopg` 3; el README dice cómo).
   Son la evidencia de B3-R2-01/02/03; sin repetirlos, cuentan como evidencia
   aportada por Claude.

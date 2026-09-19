@@ -3,8 +3,11 @@
 Fecha: 2026-09-19 · Propuesta de Claude para decisión de Adrián y revisión de Codex ·
 Estado: **diseño**, nada implementado. Responde a las cinco faltas del informe 23;
 rev. 4 (2026-09-19) incorpora los problemas 2 y 3 del informe 24 (aislamiento por
-sucursal en el esquema y confirmación por el par lista+versión), ensayados en
-`servidor/ensayos_b3/test_ensayo_destinos.py`.
+sucursal en el esquema y confirmación por el par lista+versión); rev. 5 (2026-09-19)
+responde al informe 25: la confirmación identifica una **entrega numerada** por
+pantalla (no solo el par), el historial de versiones es por empresa, y mover una
+pantalla exige limpiar sus relaciones (la base no lo hace en cascada). Ensayado en
+`servidor/ensayos_b3/test_ensayo_destinos.py` (10).
 
 ## 1. Qué pide RF-26
 
@@ -31,8 +34,10 @@ Reglas de cambio de miembros y borrado:
   "Estas 2 pantallas volverán a la lista al aire".
 - Borrar una lista borra sus destinos; ídem. Borrar una pantalla borra su
   pertenencia a grupos y sus destinos directos.
-- Mover una pantalla de sucursal la saca de todos los grupos **y destinos** de
-  la sucursal de origen (lo impone el esquema, §6); el panel lo avisa al mover.
+- Mover una pantalla de sucursal **exige** quitarla antes de todos los grupos
+  y destinos de la sucursal de origen: la base rechaza el movimiento mientras
+  queden (§6); el servidor lo hace en una sola transacción y el panel lo avisa
+  en el cuadro de "Mover a…" ("saldrá de Salas y dejará de reproducir Promos").
 
 ## 3. Prioridad: una sola regla, escrita
 
@@ -40,9 +45,16 @@ Lista efectiva de una pantalla, en este orden y sin excepciones:
 
 1. **Destino directo** a la pantalla. Solo puede haber uno (`un_destino_por_pantalla`).
 2. Si no hay, entre los grupos a los que pertenece y que tienen lista, el de
-   **mayor `prioridad`**; a igual prioridad, el asignado **más recientemente**.
-   La prioridad es un número por destino de grupo que el administrador ve y
-   puede cambiar ("Salas manda sobre Con turnos").
+   **mayor `prioridad`**; a igual prioridad, el asignado **más recientemente**
+   (`asignado_en`); si aun así empatan (mismo instante, posible en una
+   asignación en lote), el de **menor `grupo_id`**: el orden total es
+   `ORDER BY prioridad DESC, asignado_en DESC, grupo_id ASC LIMIT 1` y no
+   depende del plan de consulta (pendiente conservado del informe 25). Un
+   empate en `prioridad` entre grupos que comparten pantallas es, además, un
+   **conflicto** que el panel muestra y pide resolver; el orden anterior solo
+   garantiza que, mientras tanto, todas las pantallas y el servidor resuelvan
+   igual. La prioridad es un número por destino de grupo que el administrador
+   ve y puede cambiar ("Salas manda sobre Con turnos").
 3. Si no hay, la **programación** vigente (B7), cuando exista.
 4. Si no hay, la **lista al aire** de la sucursal.
 
@@ -70,61 +82,80 @@ explícita, la intención nunca es ambigua: lo que no se puede aplicar se dice.
 
 ## 5. Estados de entrega por pantalla: qué prueba cada uno
 
-**Rev. 4 (informe 24, problema 3):** la identidad de lo entregado es siempre
-el **par `(lista_id, version)`**, nunca el número solo. Dos listas distintas
-pueden ir ambas por la "versión 1"; una TV que confirma "1" no dice qué lista
-reproduce. Por eso la app envía y el servidor guarda el par, y la comparación
-"al día" es igualdad de pares.
+**Rev. 5 (informe 25, problema 1).** Lo que se confirma no es un contenido
+sino una **entrega**. Cada vez que el servidor sirve una lista a una pantalla
+crea una entrega con número consecutivo **por pantalla** (1, 2, 3…) que
+registra el par `(lista_id, version)` servido y cuándo. La respuesta a la TV
+lleva ese número (`entrega`), la TV lo devuelve en el latido (`en=`) y en la
+confirmación de reproducción, y el servidor guarda tres números por pantalla:
+enviada, recibida, reproduciendo. "Al día" es **igualdad de números de
+entrega**. El par solo no bastaba: dos listas distintas pueden ir por la
+"versión 1" (informe 24) y, sobre todo, dos asignaciones sucesivas de la
+**misma** lista (L1 → L2 → L1) tienen el mismo par, así que una confirmación
+de la primera asignación parecía "al día" en la tercera (informe 25).
 
 | Estado | Qué significa exactamente | Cómo se sabe | Disponible desde |
 |---|---|---|---|
-| **enviada** | El servidor guardó el destino y la próxima respuesta a esa pantalla llevará la lista L en su versión N | `lista_destino` + `lista.version`; al servir `/playlist.json` se anota `pantalla.(lista_env_id, lista_env_version) = (L, N)` y la respuesta lleva `lista_id` y `version` | B6 con el servidor actual |
-| **recibida** | La TV **declaró** en un latido posterior que tiene aplicada (L, N) | La app manda `l=<lista_id>&lv=N` en el latido (parámetros nuevos, mismo mecanismo que B5a); el servidor anota `(lista_rec_id, lista_rec_version)`. Que la TV pida la playlist **no** cuenta: solo cuenta que **diga** qué par aplicó | B5b (app build siguiente + servidor) |
-| **reproduciendo** | La TV confirmó que está reproduciendo un elemento de (L, N) | Confirmación de reproducción (propuesta 7, evento idempotente por elemento); `(lista_conf_id, lista_conf_version)` | Propuesta 7 |
+| **enviada** | El servidor creó la entrega *n* = (L, N) para esa pantalla y la próxima respuesta la llevará | `pantalla_entrega` + `pantalla.entrega_env = n`; la respuesta de `/playlist.json` lleva `entrega`, `lista_id` y `version` | B6 con el servidor actual |
+| **recibida** | La TV **declaró** en un latido posterior que tiene aplicada la entrega *n* | La app manda `en=n` en el latido (parámetro nuevo, mismo mecanismo que B5a); el servidor anota `entrega_rec = n` solo si *n* es mayor que el anotado. Que la TV pida la playlist **no** cuenta: solo cuenta que **diga** qué entrega aplicó | B5b (app build siguiente + servidor) |
+| **reproduciendo** | La TV confirmó que está reproduciendo un elemento de la entrega *n* | Confirmación de reproducción (propuesta 7, evento idempotente por elemento, con `en`); `entrega_conf = n`, monótono | Propuesta 7 |
 
-Las versiones son un **historial append-only** (`lista_version`): cada `+1`
-inserta una fila y nunca se borra ni se reescribe, así una lista puede
-avanzar a la versión 2 mientras una pantalla sigue confirmando la 1, y el
-panel enseña "enviada (Promos, 2) · recibida (Promos, 1)". Un par que la lista
-nunca tuvo no se puede guardar (llave foránea al historial). Ensayado en
-`servidor/ensayos_b3/test_ensayo_destinos.py`.
+Reglas que el esquema y el SQL imponen (ensayadas, incluido el contraejemplo
+del informe 25 tal cual): una confirmación o un latido **atrasado, duplicado
+o desordenado** (número menor o igual que el ya anotado) no toca nada; una
+entrega que esa pantalla nunca recibió se rechaza; al **reconectar**, la TV
+declara en su primer latido la entrega que tiene aplicada y el panel ve la
+diferencia con la enviada (enviada 4, recibida 3) hasta que la aplique; cada
+pantalla numera por su cuenta; las
+versiones son un historial append-only **por empresa** (`lista_version`) y
+una entrega solo puede unir una pantalla y una lista de la **misma empresa**,
+diga lo que diga la aplicación. Una lista puede avanzar a la versión 2
+mientras una pantalla sigue en la entrega que llevaba la 1, y el panel
+enseña "enviada #7 (Promos v2) · reproduciendo #6 (Promos v1)".
 
 Hasta que exista cada mecanismo, el panel **no muestra** el estado
 correspondiente (no se infiere del latido). El tiempo entre estados se mide y
 se enseña ("recibida 12:41, 6 s después de enviada"); no se promete.
 
-## 6. Impacto en el modelo (B3 §3.2b, rev. 7)
+## 6. Impacto en el modelo (B3 §3.2b, rev. 8)
 
-Cuatro tablas nuevas (`grupo_pantallas`, `grupo_pantalla_miembro`,
-`lista_destino`, `lista_version`), `lista.version` y tres **pares** de
-columnas en `pantalla` (`lista_env_*`, `lista_rec_*`, `lista_conf_*`, con
-`CHECK` de par completo y FK al historial). Todas con `empresa_id` y la
-política RLS estándar (por empresa).
+Cinco tablas nuevas (`grupo_pantallas`, `grupo_pantalla_miembro`,
+`lista_destino`, `lista_version`, `pantalla_entrega`), `lista.version` y tres
+números de entrega en `pantalla` (`entrega_env`, `entrega_rec`,
+`entrega_conf`, con FK a `pantalla_entrega`). Todas con `empresa_id` y la
+política RLS estándar (por empresa); las llaves foráneas compuestas garantizan
+la empresa y la sucursal **sin depender de RLS**, que no interviene en la
+comprobación de llaves (informe 25, problema 2).
 
 **Aislamiento por sucursal (informe 24, problema 2).** La rev. 6 solo ataba
 el grupo a su sucursal; miembros y destinos comprobaban `empresa_id` y nada
 más, así que una TV de Juriquilla podía entrar en un grupo de Plaza y una
-lista de Plaza asignarse a un grupo de Juriquilla. En la rev. 7 la sucursal
+lista de Plaza asignarse a un grupo de Juriquilla. Desde la rev. 7 la sucursal
 viaja en todas las llaves: `pantalla`, `lista` y `grupo_pantallas` exponen
 `UNIQUE (id, sucursal_id)`, y `grupo_pantalla_miembro` y `lista_destino`
 llevan `sucursal_id` con llaves foráneas compuestas `(x_id, sucursal_id)`
 hacia las tres. Un cruce de sucursal es una violación de llave foránea, no
-una comprobación que el panel o la API puedan olvidar. Consecuencia
-comprobada: **mover una pantalla de sucursal la saca de sus grupos y de sus
-destinos** en cascada (la relación es de la sucursal, no viaja con la TV); el
-panel debe avisarlo en el cuadro de "Mover a…" y la pantalla queda con la
-lista al aire de la sucursal nueva hasta que se le asigne otra. Ensayado con
-el DDL de la rev. 6 (los tres cruces entraban) y el de la rev. 7 (los tres
-fallan; lo correcto entra).
+una comprobación que el panel o la API puedan olvidar.
+
+**Mover una pantalla de sucursal** (precisión del informe 25, problema 3):
+la base **no** limpia nada en cascada; **rechaza** el cambio de `sucursal_id`
+mientras la pantalla siga en algún grupo o tenga algún destino de la sucursal
+vieja. "Mover" es por tanto una transacción del servidor: borrar sus
+membresías y destinos, después mover; el panel avisa antes qué grupos y qué
+lista pierde, y la pantalla queda con la lista al aire de la sucursal nueva
+hasta que se le asigne otra. El esquema impide hacerlo a medias; no lo hace
+por uno. Sus entregas anteriores se conservan (son historia de lo que
+reprodujo), pero la siguiente respuesta crea una entrega nueva.
 
 Índices únicos que hacen imposible la ambigüedad: un destino directo por
 pantalla, una lista por grupo. Permisos: crear/editar grupos y destinos
 requiere alcance sobre la sucursal (operador) y, para "reemplazar" un destino
 ajeno, el mismo permiso; borrar grupos, administrador. Reutilización entre
-sucursales: **no** (ahora lo impide el esquema; copiar una lista a otra
-sucursal es otra función). Migración desde hoy: `tvs[id].lista` se convierte
-en un destino directo por pantalla, con la sucursal de la pantalla; no hay
-grupos que migrar.
+sucursales: **no** (lo impide el esquema; copiar una lista a otra sucursal es
+otra función). Migración desde hoy: `tvs[id].lista` se convierte en un
+destino directo por pantalla, con la sucursal de la pantalla; no hay grupos ni
+entregas que migrar (la primera entrega la crea el primer `/playlist.json`
+tras el corte).
 
 ## 7. Qué cambia en el prototipo (rev. 3)
 
