@@ -12,6 +12,12 @@ Las TVs consultan el servidor cada 4 segundos.
 v6.10 (B2, higiene): bitacora de errores a archivo, cuatro carreras cerradas,
 cola de conexiones de 5 a 64, los 404 ya no cuentan como reproduccion y las
 pantallas nuevas ya no reutilizan numeros. Sin cambios de contrato.
+
+v6.10.1 (B5a, estado real y operacion remota): el latido de la TV puede traer
+parametros opcionales con su estado (version, modelo, sistema, IP, que
+reproduce, MB en cache, ultimo error); se guardan en tvs.json y el panel los
+muestra. Dos comandos nuevos: "recargar" y "vaciar_cache". Una app 5.1/5.2
+que no manda parametros sigue funcionando igual: nada es obligatorio.
 """
 
 import base64
@@ -490,9 +496,42 @@ def generar_miniatura(clave, nombre):
 
 # ---------------- pantallas y comandos ----------------
 
-def registrar_tv(id_tv):
+# Parametros opcionales del latido (app 5.2 build 61+): clave corta en la URL
+# -> nombre guardado, con tope de longitud. Nada de esto es obligatorio.
+ESTADO_TV_CAMPOS = {
+    "v": ("version", 16), "m": ("modelo", 40), "os": ("sistema", 24),
+    "ip": ("ip", 45), "r": ("reproduciendo", 80), "e": ("error", 120),
+}
+
+
+def estado_tv_de(params):
+    """Extrae el estado reportado por la TV de los parametros del latido.
+    Devuelve {} si no trae ninguno (app anterior)."""
+    estado = {}
+    for corto, (nombre, tope) in ESTADO_TV_CAMPOS.items():
+        valor = params.get(corto, [""])[0]
+        if valor:
+            estado[nombre] = valor[:tope]
+    try:
+        if params.get("c"):
+            estado["cache_mb"] = max(0, min(int(params["c"][0]), 100000))
+    except ValueError:
+        pass
+    try:
+        if params.get("eh") and "error" in estado:
+            estado["error_hace"] = max(0, min(int(params["eh"][0]), 10**9))
+    except ValueError:
+        pass
+    if params.get("k", [""])[0] == "1":
+        estado["desde_cache"] = True
+    return estado
+
+
+def registrar_tv(id_tv, estado=None):
     with CANDADO:
-        """Registra la TV; devuelve (indice, sucursal, aprobada, codigo)."""
+        """Registra la TV; devuelve (indice, sucursal, aprobada, codigo).
+        `estado` (B5a) es lo que la TV reporto en este latido; se guarda tal
+        cual con la hora, para que el panel lo muestre."""
         if not id_tv:
             return 0, SUCURSAL_INICIAL["clave"], False, "000000"
         tvs = leer_json(ARCHIVO_TVS, {})
@@ -512,6 +551,11 @@ def registrar_tv(id_tv):
         t.setdefault("codigo", "")
         t.setdefault("sucursal", sucursales()[0]["clave"])
         t.setdefault("zona", "")
+        if estado:
+            if "error_hace" in estado:
+                # se guarda el instante absoluto del error, no "hace cuanto"
+                estado["error_en"] = t["visto"] - estado.pop("error_hace")
+            t["estado"] = estado
         escribir_json(ARCHIVO_TVS, tvs)
         return t["indice"], t["sucursal"], t["aprobada"], t["codigo"]
 
@@ -537,6 +581,7 @@ def pantallas(clave=None):
             "lista": info.get("lista", ""),
             "pausada": info.get("pausada", False),
             "silencio": info.get("silencio", False),
+            "estado": info.get("estado", {}),
         })
     return lista
 
@@ -789,7 +834,7 @@ class Manejador(BaseHTTPRequestHandler):
         # ---- rutas abiertas para las TVs ----
         if ruta.path == "/playlist.json":
             id_tv = params.get("id", [""])[0][:64]
-            indice, clave, aprobada, codigo = registrar_tv(id_tv)
+            indice, clave, aprobada, codigo = registrar_tv(id_tv, estado_tv_de(params))
             if not aprobada:
                 self._responder(200, json.dumps({
                     "pendiente": True,
@@ -1534,7 +1579,8 @@ class Manejador(BaseHTTPRequestHandler):
             datos = self._json_body()
             clave = self._sucursal_de({"sucursal": [str(datos.get("sucursal", ""))]}, u)
             accion = str(datos.get("accion", ""))
-            if accion not in ("pausa", "continuar", "reproducir", "silencio", "sonido"):
+            if accion not in ("pausa", "continuar", "reproducir", "silencio", "sonido",
+                              "recargar", "vaciar_cache"):
                 self._responder(400, '{"error":"accion invalida"}')
                 return
             url, tipo, dur = "", "", 10
@@ -1744,6 +1790,8 @@ PANEL_HTML = """<!DOCTYPE html>
     text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
   .detalle { font-size: 12.5px; color: var(--gris); display: flex;
     align-items: center; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+  .estado-tv { display: block; font-size: 11.5px; opacity: .85; margin-top: 2px; word-break: break-word; }
+  .estado-tv.error { color: #C0392B; }
   .dur { width: 52px; padding: 4px 6px; border: 1px solid var(--borde); border-radius: 8px;
     font: 500 13px "Poppins", sans-serif; text-align: center; }
   .dur:focus { outline: none; border-color: var(--rosa-fuerte); }
@@ -2054,6 +2102,31 @@ $("masSucursal").onclick = async () => {
   await cargarSucursales();
 };
 
+/* ---------- pantallas: estado real reportado por la TV (B5a) ---------- */
+function haceTexto(seg) {
+  if (seg < 60) return "hace " + seg + " s";
+  if (seg < 3600) return "hace " + Math.floor(seg / 60) + " min";
+  if (seg < 86400) return "hace " + Math.floor(seg / 3600) + " h";
+  return "hace " + Math.floor(seg / 86400) + " d";
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function estadoTvHtml(t) {
+  const e = t.estado || {};
+  if (!e.version && !e.reproduciendo) return "";   // app anterior: no reporta
+  const partes = [];
+  if (e.reproduciendo) partes.push((e.desde_cache ? "▶ (sin red) " : "▶ ") + esc(e.reproduciendo));
+  if (e.cache_mb !== undefined) partes.push("cache " + e.cache_mb + " MB");
+  if (e.version) partes.push("app " + esc(e.version));
+  if (e.modelo) partes.push(esc(e.modelo) + (e.sistema ? " · OS " + esc(e.sistema) : ""));
+  if (e.ip) partes.push(esc(e.ip));
+  let html = '<div class="detalle estado-tv">' + partes.join(" · ") + "</div>";
+  if (e.error) {
+    const hace = e.error_en ? haceTexto(Math.max(0, Math.floor(Date.now() / 1000) - e.error_en)) : "";
+    html += '<div class="detalle estado-tv error">último error: ' + esc(e.error) + (hace ? " · " + hace : "") + "</div>";
+  }
+  return html;
+}
+
 /* ---------- pantallas ---------- */
 async function cargarTvs() {
   const r = await fetch("/api/tvs?sucursal=" + sucursal);
@@ -2074,6 +2147,7 @@ async function cargarTvs() {
         <input class="zona-input" value="${t.zona || ""}" placeholder="Zona (ej. Recepción)">
         <div class="detalle"><span class="punto ${t.en_linea ? "on" : ""}"></span>
           ${t.corto} · ${t.en_linea ? "en línea" : "sin conexión"}</div>
+        ${estadoTvHtml(t)}
       </div>
       <label class="opcion" style="font-size:12.5px" title="Mostrar turnos en esta pantalla">
         <span class="sw"><input type="checkbox" class="sw-turnos" ${t.turnos ? "checked" : ""}><i></i></span>
@@ -2089,6 +2163,8 @@ async function cargarTvs() {
         }</select>` : ""}
         <button class="btn btn-ctrl btn-pp" title="${t.pausada ? "Continuar" : "Pausar"}">${t.pausada ? ICONO_PLAY : ICONO_PAUSA}</button>
         <button class="btn btn-ctrl btn-mute" title="Silenciar / activar sonido" style="${t.silencio ? "color:#FF5A5F" : ""}">${t.silencio ? ICONO_MUDO : ICONO_SONIDO}</button>
+        ${yo.rol === "admin" ? '<button class="btn btn-ctrl btn-recargar" title="Recargar la app de esta pantalla (vuelve a pedir la lista y empieza de nuevo)">↻</button>' : ""}
+        ${yo.rol === "admin" ? '<button class="btn btn-ctrl btn-vaciar" title="Vaciar la cache de esta pantalla (vuelve a descargar su contenido)">⌫</button>' : ""}
         ${yo.rol === "admin" ? '<button class="btn btn-icono btn-peligro btn-quitar" title="Eliminar pantalla">✕</button>' : ""}
       </div>`;
     const zonaIn = li.querySelector(".zona-input");
@@ -2105,6 +2181,10 @@ async function cargarTvs() {
       pp.title = t.pausada ? "Continuar" : "Pausar";
       comando(t.id, t.pausada ? "pausa" : "continuar");
     };
+    const rec = li.querySelector(".btn-recargar");
+    if (rec) rec.onclick = () => { comando(t.id, "recargar"); avisoGuardado(); };
+    const vac = li.querySelector(".btn-vaciar");
+    if (vac) vac.onclick = () => { if (confirm("¿Vaciar la cache de la pantalla " + t.numero + "? Volverá a descargar su contenido.")) { comando(t.id, "vaciar_cache"); avisoGuardado(); } };
     const mute = li.querySelector(".btn-mute");
     mute.onclick = () => {
       t.silencio = !t.silencio;
@@ -2673,7 +2753,7 @@ if __name__ == "__main__":
     migrar()
     ip = ip_local()
     print("=" * 56)
-    print("  LUMIN TV 6.10 — servidor de anuncios")
+    print("  LUMIN TV 6.10.1 — servidor de anuncios")
     print(f"  Bitácora:          {os.path.join(DIR_REGISTRO, 'lumin.log')}")
     print(f"  Panel de control:  http://localhost:{PUERTO}")
     print(f"  URL para las TVs:  http://{ip}:{PUERTO}")

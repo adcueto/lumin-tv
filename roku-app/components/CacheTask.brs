@@ -60,6 +60,7 @@ sub ejecutar()
     m.port = CreateObject("roMessagePort")
     m.top.observeField("deseados", m.port)
     m.top.observeField("reconectado", m.port)
+    m.top.observeField("vaciar", m.port)
 
     limpiarTemporales()
     bytesEnCache()
@@ -111,7 +112,22 @@ sub atenderMensaje(msg as dynamic)
         aplicarDeseados(msg.getData())
     else if msg.getField() = "reconectado"
         reanimarAgotados()
+    else if msg.getField() = "vaciar"
+        vaciarCache()
     end if
+end sub
+
+' Comando "vaciar cache" del panel (B5a): borra todos los medios en cache y
+' olvida el registro. La lista guardada NO se borra (es la continuidad sin
+' red). La escena vuelve a pedir la cache a continuacion.
+sub vaciarCache()
+    for each a in listarCache()
+        if a.ruta <> rutaPlaylistCache() then m.fs.Delete(a.ruta)
+    end for
+    m.registro = {}
+    m.cola = []
+    m.top.bytesEnCache = 0
+    m.top.vaciado = m.top.vaciado + 1
 end sub
 
 ' Volvio la red: lo que se agoto por red merece otra oportunidad.
@@ -335,6 +351,13 @@ function descargar(url as string, destino as string) as string
         ' trabajo obsoleto: llego una lista nueva y este archivo ya no esta
         msg = m.port.GetMessage()
         if type(msg) = "roSGNodeEvent"
+            if msg.getField() = "vaciar"
+                ' vaciar la cache tambien cancela lo que se estaba bajando
+                xfer.AsyncCancel()
+                borrarSiExiste(temporal)
+                atenderMensaje(msg)
+                return "obsoleto"
+            end if
             atenderMensaje(msg)
             if msg.getField() = "deseados" and not m.deseadas.DoesExist(url)
                 xfer.AsyncCancel()

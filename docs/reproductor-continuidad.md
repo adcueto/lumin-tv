@@ -1,4 +1,4 @@
-# Reproductor Roku — continuidad y recuperación (app 5.2 build 60)
+# Reproductor Roku — continuidad y recuperación (app 5.2 build 61)
 
 Qué hace la app cuando falla la red o un archivo, qué garantiza y qué no.
 Referencia para operación, para QA y para las pruebas en TV física.
@@ -130,6 +130,9 @@ cortar la corriente de la TV**.
 | F19 | 404 sostenido (R2-B1-02) | En la lista, un video cuyo archivo se borró del servidor. Dejar la TV 10 min con la lista sin cambios | En el log aparece **un solo** intento (`http_404`); las reconciliaciones periódicas no lo vuelven a intentar. Pasados 30 min, un intento más |
 | F20 | Seis intentos con lista estable (R2-B1-02) | Bloquear en el router solo el puerto del servidor (no todo el WAN, para que `/playlist.json` siga si se sirve aparte) o, más simple: cortar el WAN justo al asignar una lista nueva y dejarlo cortado 15 min | Exactamente 6 intentos del mismo archivo con esperas crecientes (30, 60, 120, 240, 300 s) y luego `agotado`. Al reconectar, vuelve a intentarse desde cero y termina descargando |
 | F21 | Reconciliación durante una descarga que falla (R2-B1-02) | Con un archivo grande (~70 MB) bajando por una red lenta, cambiar dos veces otra parte de la lista (p. ej. el cintillo) en menos de 60 s | El log muestra una sola descarga activa de ese archivo; no aparece un segundo intento paralelo ni se reinicia el contador de intentos |
+| F22 | Estado real en el panel (B5a) | Con build 61 contra un servidor 6.10.1 de pruebas, abrir el panel | Bajo la pantalla aparece "▶ <archivo> · cache N MB · app 5.2.61 · <modelo> · OS x · <IP>"; el archivo coincide con lo que se ve en la TV y cambia al cambiar de elemento |
+| F23 | Recargar desde el panel (B5a) | Pulsar ↻ en la tarjeta de la pantalla | En menos de 10 s la TV corta lo que estaba y arranca la lista desde el primer elemento; en el panel desaparece el "último error" si lo había |
+| F24 | Vaciar cache desde el panel (B5a) | Pulsar ⌫ y confirmar; mirar `telnet IP 8085` | Se borran los `cachefs:/lumin_…` de medios (no `lumin_playlist.json`), el panel baja a "cache 0 MB" y en el siguiente minuto vuelven a descargarse; la reproducción por red no se interrumpe |
 | F13 | Regresión de lo que ya funcionaba | Cintillo animado y fijo, cambio de velocidad, lista asignada a esa TV, turno normal con próximos y espera, silencio/sonido, "Enviar a…" con foto de 15 s | Todo igual que en 5.1 |
 
 Registrar para cada prueba: modelo de Roku, versión de Roku OS, resultado y,

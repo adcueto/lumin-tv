@@ -16,5 +16,10 @@
         <field id="reconectado" type="integer" value="0" alwaysNotify="true" />
         <!-- Salida: total de bytes actualmente en cache, para diagnostico -->
         <field id="bytesEnCache" type="integer" value="0" />
+        <!-- B5a. Entrada: la escena lo incrementa con el comando "vaciar cache"
+             del panel; se borran los medios (no la lista guardada) -->
+        <field id="vaciar" type="integer" value="0" alwaysNotify="true" />
+        <!-- B5a. Salida: se incrementa al terminar de vaciar -->
+        <field id="vaciado" type="integer" value="0" alwaysNotify="true" />
     </interface>
 </component>

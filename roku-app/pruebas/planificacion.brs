@@ -25,6 +25,7 @@ sub main()
     prueba_R3_B1_02_sin_espacio_se_libera_si_se_libero_espacio()
     prueba_404_cuarentena_30_min()
     prueba_url_que_sale_de_la_lista_se_olvida()
+    prueba_B5a_vaciar_cache_conserva_la_lista_y_rellena()
 
     print "RESUMEN: " + m.comprobaciones.ToStr() + " comprobaciones, " + m.fallos.ToStr() + " fallos"
 end sub
@@ -32,7 +33,7 @@ end sub
 ' ---------------------------------------------------------------- utilerias
 
 sub preparar()
-    m.top = {}
+    m.top = {vaciado: 0, bytesEnCache: 0}
     m.fs = nuevoDiscoFalso()
     m.reloj = {ms: 0, TotalMilliseconds: function() as integer
         return m.ms
@@ -316,4 +317,27 @@ sub prueba_url_que_sale_de_la_lista_se_olvida()
     aplicarDeseados(lista(["http://s/v/b.mp4"]))
     comprobar(not m.fs.Exists(rutaDeCache(u)), "al salir de la lista se borra")
     comprobar(m.registro[u] = invalid, "y se olvida su registro")
+end sub
+
+' B5a: comando "vaciar cache" del panel
+sub prueba_B5a_vaciar_cache_conserva_la_lista_y_rellena()
+    titulo("B5a vaciar cache: borra medios, conserva la lista guardada y vuelve a bajar")
+    preparar()
+    a = "http://s/v/a.mp4"
+    b = "http://s/v/b.jpg"
+    escribirArchivo(rutaPlaylistCache(), 500)
+    m.simulacion.respuestas = ["ok"]
+    aplicarDeseados(lista([a, b]))
+    avanzar(0)
+    comprobar(m.fs.Exists(rutaDeCache(a)) and m.fs.Exists(rutaDeCache(b)), "los dos medios en cache")
+    vaciarCache()
+    comprobar(not m.fs.Exists(rutaDeCache(a)) and not m.fs.Exists(rutaDeCache(b)), "medios borrados")
+    comprobar(m.fs.Exists(rutaPlaylistCache()), "la lista guardada NO se borra")
+    comprobar(m.registro.Count() = 0 and m.cola.Count() = 0, "registro y cola vacios")
+    comprobar(m.top.vaciado = 1 and m.top.bytesEnCache = 0, "se anuncia el vaciado y 0 bytes")
+    ' la escena vuelve a pedir la misma lista
+    aplicarDeseados(lista([a, b]))
+    avanzar(0)
+    comprobar(intentosDe(a) = 2 and intentosDe(b) = 2, "se vuelven a bajar los dos")
+    comprobar(m.fs.Exists(rutaDeCache(a)) and m.fs.Exists(rutaDeCache(b)), "y quedan en cache otra vez")
 end sub

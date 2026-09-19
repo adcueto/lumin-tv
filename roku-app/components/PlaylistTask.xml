@@ -12,5 +12,10 @@
         <field id="ultimaSincronizacion" type="string" value="" />
         <!-- true cuando playlistJson viene de la copia local y no del servidor -->
         <field id="desdeCache" type="boolean" value="false" />
+        <!-- B5a. Entrada: estado que la escena quiere reportar en el latido:
+             {r: reproduciendo, c: MB en cache, k: desde cache, e: ultimo error, et: epoch del error} -->
+        <field id="estado" type="assocarray" />
+        <!-- B5a. Entrada: la escena lo incrementa para consultar sin esperar el intervalo -->
+        <field id="consultarAhora" type="integer" value="0" alwaysNotify="true" />
     </interface>
 </component>

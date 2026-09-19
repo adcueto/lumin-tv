@@ -47,6 +47,8 @@ sub init()
     m.ultimosDatos = invalid
     m.ultimaReconciliacion = 0
     m.cachePedidaEnVivo = false
+    ' B5a: estado real que viaja en el latido (ver publicarEstado)
+    m.estadoTv = {r: "", c: 0, k: false, e: "", et: 0}
 
     m.turnoGrp = m.top.findNode("turno")
     m.tPanel = m.top.findNode("tPanel")
@@ -107,6 +109,8 @@ sub init()
     m.cacheTask = createObject("roSGNode", "CacheTask")
     m.cacheTask.observeField("listo", "onCacheListo")
     m.cacheTask.observeField("fallo", "onCacheFallo")
+    m.cacheTask.observeField("bytesEnCache", "onBytesEnCache")
+    m.cacheTask.observeField("vaciado", "onCacheVaciada")
     m.cacheTask.control = "RUN"
 
     m.video.observeField("state", "onVideoState")
@@ -333,6 +337,7 @@ sub reproducirSiguiente()
             saltarBloqueada()
             return
         end if
+        anotarReproduciendo(seg.url)
         mostrarFoto(resolverUrl(seg.url), seg.duracion, false, false, seg.url)
     else
         m.timerFoto.control = "stop"
@@ -359,6 +364,7 @@ sub reproducirSiguiente()
             saltarBloqueada()
             return
         end if
+        anotarReproduciendo(m.urlsEnVideo[0])
         m.video.visible = true
         m.video.control = "stop"
         m.video.contentIsPlaylist = true
@@ -488,8 +494,54 @@ sub onCacheListo()
 end sub
 
 sub onCacheFallo()
-    ' Informativo. Una descarga fallida no afecta la reproduccion por red.
+    ' Informativo. Una descarga fallida no afecta la reproduccion por red,
+    ' pero si se reporta en el latido para verla desde el panel (B5a).
+    f = m.cacheTask.fallo
+    if f <> invalid and f.motivo <> invalid and f.motivo <> "sin_espacio"
+        anotarError("cache " + f.motivo + " " + nombreDeUrl(f.url))
+    end if
 end sub
+
+sub onBytesEnCache()
+    m.estadoTv.c = Int(m.cacheTask.bytesEnCache / 1048576)
+    publicarEstado()
+end sub
+
+sub onCacheVaciada()
+    ' la cache quedo vacia: volver a pedir lo de la lista vigente
+    m.cacheInservibleVideo = 0
+    if m.ultimosDatos <> invalid then pedirCache(m.ultimosDatos)
+end sub
+
+' ---------- B5a: estado real hacia el servidor ----------
+
+sub anotarReproduciendo(url as string)
+    m.estadoTv.r = nombreDeUrl(url)
+    publicarEstado()
+end sub
+
+sub anotarError(texto as string)
+    m.estadoTv.e = texto
+    m.estadoTv.et = ahoraSegundos()
+    publicarEstado()
+end sub
+
+sub publicarEstado()
+    m.estadoTv.k = m.enRespaldo or (m.task.desdeCache = true) or (m.task.conectado = false)
+    m.task.estado = m.estadoTv
+end sub
+
+function nombreDeUrl(url as dynamic) as string
+    if url = invalid then return ""
+    s = url
+    q = s.Instr("?")
+    if q >= 0 then s = Left(s, q)
+    p = s.Len() - 1
+    while p >= 0 and Mid(s, p + 1, 1) <> "/"
+        p = p - 1
+    end while
+    return Mid(s, p + 2)
+end function
 
 ' Fotos y miniaturas: cachefs esta recomendado por Roku para imagenes.
 function resolverUrl(url as string) as string
@@ -575,6 +627,8 @@ sub contenidoEnPantalla()
 end sub
 
 sub mostrarRespaldo(motivo = "" as string)
+    m.estadoTv.r = "(lamina)"
+    publicarEstado()
     m.timerFoto.control = "stop"
     m.timerBuffer.control = "stop"
     m.video.control = "stop"
@@ -639,6 +693,7 @@ sub onConectado()
             actualizarDetalle()
         end if
     end if
+    publicarEstado()
 end sub
 
 ' ---------- Comandos en vivo desde el panel ----------
@@ -688,6 +743,10 @@ sub manejarComando(datos as object)
         m.video.mute = true
     else if c.accion = "sonido"
         m.video.mute = false
+    else if c.accion = "recargar"
+        recargar()
+    else if c.accion = "vaciar_cache"
+        m.cacheTask.vaciar = m.cacheTask.vaciar + 1
     else if c.accion = "reproducir" and c.url <> invalid and c.url <> ""
         if c.tipo = "imagen"
             dur = 10
@@ -713,6 +772,28 @@ sub manejarComando(datos as object)
     end if
 end sub
 
+' B5a: comando "recargar" del panel. Equivale a volver a abrir la app sin
+' tocar la TV: se olvidan los bloqueos y fallos, se pide la lista de
+' inmediato y se vuelve a empezar desde el primer elemento.
+sub recargar()
+    m.timerFoto.control = "stop"
+    m.timerBuffer.control = "stop"
+    m.timerReintento.control = "stop"
+    m.video.control = "stop"
+    m.fallosPorUrl = {}
+    m.bloqueadasHasta = {}
+    m.fallosSeguidos = 0
+    m.cacheInservibleVideo = 0
+    m.playlistActual = ""      ' la siguiente lista se trata como nueva
+    m.indice = 0
+    m.fotoRapida = false
+    m.estado.text = ""
+    m.estadoTv.e = ""
+    m.estadoTv.et = 0
+    publicarEstado()
+    m.task.consultarAhora = m.task.consultarAhora + 1
+end sub
+
 ' ---------- Reproduccion de video ----------
 
 sub onVideoState()
@@ -726,6 +807,8 @@ sub onVideoState()
         m.estado.text = ""
         m.ayuda.text = ""
         contenidoEnPantalla()
+        i = m.video.contentIndex
+        if i <> invalid and i >= 0 and i < m.urlsEnVideo.Count() then anotarReproduciendo(m.urlsEnVideo[i])
     else if estado = "finished"
         m.timerBuffer.control = "stop"
         reproducirSiguiente()
@@ -756,6 +839,7 @@ sub atenderFalloDeVideo(causa as string)
     if m.urlsEnVideo.Count() > 0
         url = m.urlsEnVideo[i]
         ruta = m.rutasEnVideo[i]
+        anotarError("video " + causa + " " + nombreDeUrl(url))
         if Left(ruta, 8) = "cachefs:"
             ' La copia local no se pudo reproducir. Puede ser el archivo o que
             ' este modelo no reproduzca desde cachefs: borrarla y, si se

@@ -30,6 +30,16 @@ sub ejecutar()
 
     m.port = CreateObject("roMessagePort")
     m.top.observeField("saveUrl", m.port)
+    m.top.observeField("consultarAhora", m.port)
+
+    ' B5a: datos fijos del equipo que viajan en cada latido
+    ai = CreateObject("roAppInfo")
+    osv = di.GetOSVersion()
+    m.fijo = {
+        v: ai.GetVersion(),
+        m: di.GetModel(),
+        os: osv.major + "." + osv.minor + "." + osv.revision + "." + osv.build
+    }
 
     INTERVALO_BASE = 4000
     INTERVALO_MAX = 30000
@@ -108,7 +118,7 @@ function consultarConTope(baseUrl as string, topeMs as integer) as dynamic
     xfer.InitClientCertificates()
     xfer.RetainBodyOnError(false)
     xfer.EnableFreshConnection(false)
-    xfer.SetUrl(baseUrl + "/playlist.json?id=" + m.idTv)
+    xfer.SetUrl(baseUrl + "/playlist.json?id=" + m.idTv + parametrosDeEstado(xfer))
 
     puerto = CreateObject("roMessagePort")
     xfer.SetMessagePort(puerto)
@@ -124,6 +134,38 @@ function consultarConTope(baseUrl as string, topeMs as integer) as dynamic
     cuerpo = evento.GetString()
     if cuerpo = invalid or cuerpo = "" then return invalid
     return cuerpo
+end function
+
+' B5a: estado real de la pantalla, como parametros del mismo latido. El
+' servidor 6.9 los ignora; el 6.10 los guarda para el panel. Todo corto: el
+' latido sigue siendo una peticion pequena cada 4 s.
+function parametrosDeEstado(xfer as object) as string
+    q = "&v=" + xfer.Escape(m.fijo.v) + "&m=" + xfer.Escape(m.fijo.m) + "&os=" + xfer.Escape(m.fijo.os)
+    ip = ipLocal()
+    if ip <> "" then q = q + "&ip=" + xfer.Escape(ip)
+    e = m.top.estado
+    if e <> invalid
+        if e.r <> invalid and e.r <> "" then q = q + "&r=" + xfer.Escape(Left(e.r, 60))
+        if e.c <> invalid then q = q + "&c=" + e.c.ToStr()
+        if e.k <> invalid and e.k = true then q = q + "&k=1"
+        if e.e <> invalid and e.e <> "" then q = q + "&e=" + xfer.Escape(Left(e.e, 80))
+        if e.et <> invalid and e.et > 0
+            hace = CreateObject("roDateTime").AsSeconds() - e.et
+            if hace < 0 then hace = 0
+            q = q + "&eh=" + hace.ToStr()
+        end if
+    end if
+    return q
+end function
+
+function ipLocal() as string
+    di = CreateObject("roDeviceInfo")
+    ips = di.GetIPAddrs()
+    if ips = invalid then return ""
+    for each k in ips
+        if ips[k] <> invalid and ips[k] <> "" then return ips[k]
+    end for
+    return ""
 end function
 
 function ahoraTexto() as string
