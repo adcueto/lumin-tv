@@ -1,9 +1,16 @@
-# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 5)
+# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 6)
 
 Para revisión de Adrián y Codex **antes de escribir código**.
 Fecha: 2026-09-17 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 60)
 
-## Qué cambia en esta revisión 5 (respuesta a `22-qa-B3-rev4-B5a-1f7782e.md`)
+## Qué cambia en esta revisión 6 (respuesta a `23-qa-B3-rev5-B5a-R2-3a1eaf9.md`)
+
+| Corrección de Codex | Decisión | Dónde | Ensayo |
+|---|---|---|---|
+| B3-R4-01 (continúa) [P1] una conexión `idle` preexistente sobrevivía al drenaje y podía iniciar y confirmar una escritura después | **CONFIRMADO.** El drenaje de la rev. 5 solo terminaba sesiones con transacción viva; una conexión de pool ya abierta no necesita `CONNECT` para empezar otra. Ahora la **barrera** es terminar **todas** las sesiones de `lumin_app` —también las `idle`— después de la gracia, y verificar que quedan **cero**; con la entrada cerrada, cero sesiones ahora significa cero escritores hasta que se reabra. La gracia es cortesía con lo que estaba a medias, no la barrera. Acotado al rol `lumin_app` de esta base: espejo y migración no se tocan | §7.3 | `test_ensayo_sesiones.py` (18): reproducción del caso de Codex sobre la barrera vieja (`idle` escribe después), la `idle` preexistente falla al escribir tras el drenaje y no puede reconectar, una petición admitida antes de la barrera que empieza su SQL después falla, otros roles siguen conectados; se conservan conexión nueva, transacción a tiempo, consulta activa, rollback forzado y bloqueo. Total **50** |
+| RF-26 (panel): semántica de grupos, prioridad, confirmación de reemplazo, contrato de datos, estados de entrega | Propuesta de impacto en `22-rf26-destinos-de-lista.md`; su esquema entra en este diseño como **§3.2b (contrato, no ensayado)** | §3.2b | — (diseño) |
+
+## Qué cambió en la revisión 5 (respuesta a `22-qa-B3-rev4-B5a-1f7782e.md`)
 
 Las dos correcciones de B3 se **CONFIRMAN**. Ensayos: de 39 a **46**, con la
 reproducción de cada defecto con el protocolo anterior.
@@ -303,6 +310,63 @@ la columna y la política garantizan que un `SELECT` directo tampoco.
 
 `ON DELETE CASCADE` en `lista_elemento` reproduce la regla de hoy: borrar un
 archivo lo quita de las listas; borrar una lista **no** borra archivos.
+
+### 3.2b Destinos de lista y grupos de pantallas (RF-26) — contrato, no ensayado
+
+Detalle y decisiones en `22-rf26-destinos-de-lista.md`. Lo que entra en el
+esquema para no necesitar otra migración cuando B6/B7 lo implementen:
+
+```sql
+CREATE TABLE grupo_pantallas (                    -- grupo PERSISTENTE, por sucursal
+  id           uuid PRIMARY KEY,
+  empresa_id   uuid NOT NULL,
+  sucursal_id  uuid NOT NULL,
+  nombre       text NOT NULL,
+  UNIQUE (sucursal_id, nombre),
+  UNIQUE (id, empresa_id),
+  FOREIGN KEY (sucursal_id, empresa_id) REFERENCES sucursal(id, empresa_id) ON DELETE CASCADE
+);
+CREATE TABLE grupo_pantalla_miembro (
+  grupo_id     uuid NOT NULL,
+  pantalla_id  uuid NOT NULL,
+  empresa_id   uuid NOT NULL,
+  PRIMARY KEY (grupo_id, pantalla_id),
+  FOREIGN KEY (grupo_id,    empresa_id) REFERENCES grupo_pantallas(id, empresa_id) ON DELETE CASCADE,
+  FOREIGN KEY (pantalla_id, empresa_id) REFERENCES pantalla(id, empresa_id)        ON DELETE CASCADE
+);
+-- Asignacion de una lista a un destino. Un destino es UNA pantalla o UN grupo.
+CREATE TABLE lista_destino (
+  id           uuid PRIMARY KEY,
+  empresa_id   uuid NOT NULL,
+  lista_id     uuid NOT NULL,
+  pantalla_id  uuid,                                -- exactamente uno de los dos
+  grupo_id     uuid,
+  prioridad    int  NOT NULL DEFAULT 0,             -- desempate explicito entre grupos
+  asignado_por uuid, asignado_en timestamptz NOT NULL DEFAULT now(),
+  CHECK ((pantalla_id IS NULL) <> (grupo_id IS NULL)),
+  UNIQUE (id, empresa_id),
+  FOREIGN KEY (lista_id,    empresa_id) REFERENCES lista(id, empresa_id)           ON DELETE CASCADE,
+  FOREIGN KEY (pantalla_id, empresa_id) REFERENCES pantalla(id, empresa_id)        ON DELETE CASCADE,
+  FOREIGN KEY (grupo_id,    empresa_id) REFERENCES grupo_pantallas(id, empresa_id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX un_destino_por_pantalla ON lista_destino (pantalla_id) WHERE pantalla_id IS NOT NULL;
+CREATE UNIQUE INDEX una_lista_por_grupo     ON lista_destino (grupo_id)    WHERE grupo_id IS NOT NULL;
+-- Entrega por pantalla: que version de lista le corresponde, cual pidio y cual confirmo
+ALTER TABLE lista    ADD COLUMN version int NOT NULL DEFAULT 1;   -- +1 en cada cambio de elementos/orden
+ALTER TABLE pantalla ADD COLUMN lista_version_enviada   int,       -- la que el servidor le sirvio por ultima vez
+                     ADD COLUMN lista_version_recibida  int,       -- la que la TV declaro en su latido (B5b)
+                     ADD COLUMN lista_version_reprod    int;       -- la que la TV confirmo reproduciendo (propuesta 7)
+```
+
+Resolución de la lista efectiva de una pantalla, **determinista y en este
+orden**: (1) asignación directa a la pantalla (`un_destino_por_pantalla`
+impide dos); (2) si no hay, la asignación de grupo con **mayor `prioridad`**
+entre los grupos a los que pertenece, y a igual prioridad la **más
+reciente** (`asignado_en`); (3) si no hay, la lista programada vigente (B7);
+(4) la lista al aire de la sucursal. Todas las tablas nuevas llevan
+`empresa_id` con la política estándar de §3.5 (contrato). El resto —qué se
+confirma al reemplazar, qué pasa al borrar un grupo, qué significa cada
+estado de entrega— está en el documento 22.
 
 ### 3.3 Operación
 
@@ -739,24 +803,35 @@ T+30 días Se archivan los JSON congelados (no se borran).
 
 Si algo falla en los pasos 3–5, la reversión es inmediata **pero pasa por el
 mismo guardián** que cualquier otra (rev. 4, B3-R3-02): `revertir.py` pone solo
-lectura, **drena** `lumin_app` con el contrato de la rev. 5 (B3-R4-01):
-(1) `REVOKE CONNECT ON DATABASE lumin FROM lumin_app` —la base no concede
-`CONNECT` a `PUBLIC`, solo a los tres roles—, de modo que no entra ningún
-escritor nuevo; (2) espera hasta 30 s a que ninguna conexión de `lumin_app`
-tenga una transacción capaz de confirmar (`state = 'active'`, `idle in
-transaction` o `backend_xid` no nulo); (3) al vencer el plazo, **termina**
-esas conexiones con `pg_terminate_backend` (`lumin_migracion` es miembro de
-`pg_signal_backend` y `pg_read_all_stats`): una sesión terminada hace
-rollback, nunca commit; cancelar la consulta no servía porque `idle in
-transaction` no tiene consulta que cancelar; (4) vuelve a comprobar y, si
-aún queda una transacción viva, declara **drenaje incompleto** y la reversión
-se bloquea —también la de emergencia—. Solo después espera a que el espejo
-deje cero marcas pendientes, verifica §7.4-8 y regenera `sesiones.json` con
-el estado final (§7.6); entonces arranca 6.10. La entrada se reabre con
-`GRANT CONNECT` solo al abortar la reversión y volver a 6.11. Los JSON que **nadie
-escribió** desde el paso 1 salvo el humo hacen que esa verificación sea
-trivial, pero no se omite. No existe una ruta de reversión que se salte el
-guardián.
+lectura y **drena** `lumin_app` con el contrato de la rev. 6 (B3-R4-01, dos
+vueltas):
+
+1. **Entrada cerrada:** `REVOKE CONNECT ON DATABASE lumin FROM lumin_app`. La
+   base no concede `CONNECT` a `PUBLIC`, solo a los tres roles, así que el
+   `REVOKE` es efectivo. Ninguna conexión nueva de la aplicación.
+2. **Gracia:** hasta 30 s para que las transacciones en vuelo (`active`,
+   `idle in transaction`, `backend_xid` no nulo) terminen por sí solas. Es
+   cortesía con lo que estaba a medias; **no es la barrera**.
+3. **Barrera:** `pg_terminate_backend` a **todas** las sesiones de `lumin_app`,
+   incluidas las `idle`. Una conexión de pool ya abierta no necesita `CONNECT`
+   para iniciar una transacción nueva (Codex lo reprodujo sobre la rev. 5);
+   por eso no basta con matar las que tienen transacción. Una sesión terminada
+   hace rollback, nunca commit. `lumin_migracion` es miembro de
+   `pg_signal_backend` y `pg_read_all_stats` para poder hacerlo; espejo y
+   migración no se tocan.
+4. **Verificación:** cero sesiones de `lumin_app` en `pg_stat_activity`. Con
+   la entrada cerrada, cero ahora es cero hasta que se reabra: ningún hilo
+   HTTP, trabajador ni conexión de pool puede empezar SQL después. Si queda
+   alguna, `DrenajeIncompleto` y la reversión se **bloquea**, también la de
+   emergencia.
+
+Del lado del servidor 6.11 esto se ve como errores de conexión en las
+peticiones que estaban en curso, que responden 503; el modo solo lectura HTTP
+(paso 1 del corte) reduce cuántas hay, pero la garantía la da la base, no el
+servidor. Solo después de la barrera `revertir.py` espera a que el espejo deje
+cero marcas pendientes, verifica §7.4-8 y regenera `sesiones.json` con el
+estado final (§7.6); entonces arranca 6.10. La entrada se reabre con `GRANT
+CONNECT` solo al abortar la reversión y volver a 6.11.
 
 ### 7.4 Escrituras posteriores al cambio: el espejo derivado
 
@@ -1140,7 +1215,7 @@ respaldo sí, adaptado a `pg_dump` (§7.5).
 ## 13. Lo que pido para cerrar la revisión
 
 - Las siete decisiones de §9 (D7 es nueva en esta revisión).
-- Que Codex repita los 46 ensayos de `servidor/ensayos_b3/` en su entorno
+- Que Codex repita los 50 ensayos de `servidor/ensayos_b3/` en su entorno
   (necesitan un PostgreSQL 16 de ensayo y `psycopg` 3; el README dice cómo).
   Son la evidencia de B3-R2-01/02/03; sin repetirlos, cuentan como evidencia
   aportada por Claude.

@@ -6,7 +6,7 @@ Sigue la plantilla de `06-protocolo-y-qa.md`.
 
 - ID: **B5a** (adelanto de B5 "API v2 / estado real" del plan
   `10-diagnostico-y-plan-modernizacion.md`, solo la parte que no necesita
-  PostgreSQL) · Revisión **R2**
+  PostgreSQL) · Revisión **R3**
 - Responsable: Claude (desarrollo) · Revisa: Codex
 - Fecha: 2026-09-19
 - Raíz: `lumin-tv` · Rama: `modernizacion-diagnostico`
@@ -169,3 +169,19 @@ Límite declarado: el arnés reproduce la semántica "sin notificación si el
 valor no cambia" **por construcción** (`llegaRespuesta` no llama a
 `onPlaylistJson` con JSON idéntico); no es SceneGraph. F22 sigue pendiente
 en equipo físico con build 62.
+
+---
+
+## Revisión R3 — precisiones del informe 23 (Codex, 2026-09-19)
+
+Codex cerró B5A-QA-01 y B5A-QA-02 en el alcance probado (Roku físico
+pendiente). Precisiones aplicadas en `docs/reproductor-continuidad.md`: F22
+es telemetría y exige build **62** y un servidor del **mismo SHA** que la app
+(6.10.1 no distingue el arreglo de permisos; el SHA sí); F23 queda dividida
+en **F23a** (recargar con red: respuesta idéntica y distinta), **F23b**
+(comando recibido y ejecutado, red perdida antes del refresco, con punto de
+corte fijado por el log) y **F23c** (comando emitido durante la desconexión,
+coherente con F10: `recargar` no es `reproducir` y sí se ejecuta al
+reconectar; si Adrián prefiere descartarlo, es decisión de producto). El
+servidor de pruebas local de Adrián debe reemplazarse por el del SHA nuevo
+antes de F22/F23.

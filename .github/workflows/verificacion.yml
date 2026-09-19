@@ -105,8 +105,8 @@ jobs:
       - name: pytest servidor/ensayos_b3
         working-directory: servidor
         run: python -m pytest ensayos_b3 -q -rs --junitxml=../ensayos-b3-junit.xml
-      - name: sin omitidos (46 ensayos deben ejecutarse)
-        run: python .github/scripts/sin_omitidos.py ensayos-b3-junit.xml --minimo 46
+      - name: sin omitidos (50 ensayos deben ejecutarse)
+        run: python .github/scripts/sin_omitidos.py ensayos-b3-junit.xml --minimo 50
       - uses: actions/upload-artifact@v4
         if: always()
         with:

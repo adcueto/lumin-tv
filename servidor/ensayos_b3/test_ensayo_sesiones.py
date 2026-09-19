@@ -95,43 +95,48 @@ def reabrir_entrada_lumin_app(conn) -> None:
 
 
 def _backends_app(cur):
-    """Conexiones de lumin_app y si cada una puede todavia confirmar algo."""
+    """TODAS las conexiones de lumin_app (pid, estado, con transaccion viva)."""
     return cur.execute(
         "SELECT pid, state, backend_xid IS NOT NULL OR state LIKE 'idle in transaction%%' OR state = 'active' "
         "FROM pg_stat_activity WHERE usename = 'lumin_app' AND pid <> pg_backend_pid()").fetchall()
 
 
 def drenar_lumin_app(timeout_s: float = 30.0) -> None:
-    """Drenaje rev. 5 (B3-R4-01). Contrato:
-      1. cerrar la entrada (REVOKE CONNECT): nadie nuevo;
-      2. esperar hasta timeout_s a que NINGUNA conexion de lumin_app tenga una
-         transaccion capaz de confirmar (activa, idle in transaction o con xid);
-      3. al agotar el plazo, TERMINAR esas conexiones (pg_terminate_backend):
-         una sesion terminada hace rollback, nunca commit; cancelar la consulta
-         no bastaba (idle in transaction no tiene consulta que cancelar);
-      4. volver a comprobar: si aun queda una conexion con transaccion, el
-         drenaje es incompleto y la reversion se BLOQUEA.
-    La entrada se reabre solo si el llamador lo pide (tras revertir o abortar)."""
+    """Drenaje rev. 6 (B3-R4-01, segunda vuelta). Contrato:
+      1. cerrar la entrada (REVOKE CONNECT): ninguna conexion nueva;
+      2. gracia: esperar hasta timeout_s a que ninguna conexion de lumin_app
+         tenga una transaccion capaz de confirmar (activa, idle in transaction
+         o con xid). Es cortesia con lo que ya estaba a medias, no la barrera;
+      3. la barrera: TERMINAR TODAS las sesiones de lumin_app, tambien las
+         'idle' (una conexion de pool ya abierta no necesita CONNECT para
+         empezar una transaccion nueva: Codex lo reprodujo). Una sesion
+         terminada hace rollback, nunca commit;
+      4. verificar que queda CERO sesiones de lumin_app; si no, DrenajeIncompleto
+         y la reversion se bloquea. Con la entrada cerrada, cero sesiones ahora
+         significa cero escritores para siempre hasta que se reabra.
+    Solo se toca el rol lumin_app de ESTA base. La entrada se reabre solo si el
+    llamador lo pide (al abortar la reversion o al volver a 6.11)."""
     import time as _t
     with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
         cerrar_entrada_lumin_app(c)
         cur = c.cursor()
         fin = _t.monotonic() + timeout_s
-        while _t.monotonic() < fin:
-            if not any(peligrosa for _, _, peligrosa in _backends_app(cur)):
-                return
+        while _t.monotonic() < fin and any(viva for _, _, viva in _backends_app(cur)):
             _t.sleep(0.05)
-        for pid, _, peligrosa in _backends_app(cur):
-            if peligrosa:
-                cur.execute("SELECT pg_terminate_backend(%s)", (pid,))
-        # pg_terminate_backend es asincrono: esperar a que desaparezcan
+        for pid, _, _ in _backends_app(cur):
+            cur.execute("SELECT pg_terminate_backend(%s)", (pid,))
         fin2 = _t.monotonic() + 5.0
         while _t.monotonic() < fin2:
-            restantes = [pid for pid, _, peligrosa in _backends_app(cur) if peligrosa]
+            restantes = [pid for pid, _, _ in _backends_app(cur)]
             if not restantes:
                 return
             _t.sleep(0.05)
-        raise DrenajeIncompleto(f"conexiones con transaccion viva tras terminar: {restantes}")
+        raise DrenajeIncompleto(f"sesiones de lumin_app que siguen abiertas tras terminar: {restantes}")
+
+
+def sesiones_app_abiertas() -> int:
+    with psycopg.connect(dsn_rol("lumin_migracion")) as c:
+        return len(_backends_app(c.cursor()))
 
 
 def revertir(congelado: dict, destino: Path, *, emergencia_autorizada: bool = False, dsn_espejo: str | None = None) -> dict:
@@ -404,3 +409,81 @@ def test_revertir_se_bloquea_si_el_drenaje_no_puede_completarse(base, monkeypatc
         with pytest.raises(ReversionBloqueada):
             revertir(congelado, s.dir / "sesiones.json", emergencia_autorizada=True)
         assert (s.dir / "sesiones.json").read_bytes() == antes, "ni en emergencia se escribe con drenaje incompleto"
+
+
+def test_reproduccion_r4_01b_idle_preexistente_podia_escribir_despues(base):
+    """Lo que Codex reprodujo sobre la rev. 5: una conexion idle sobrevive al
+    drenaje viejo (solo mataba transacciones vivas) y escribe despues."""
+    import uuid
+    from comun import EMPRESA_A, mutar_sucursal
+    a = psycopg.connect(dsn_rol("lumin_app"))            # abierta, idle, sin transaccion
+    try:
+        with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+            cerrar_entrada_lumin_app(c)                   # el drenaje viejo: puerta cerrada...
+            cur = c.cursor()
+            assert not any(viva for _, _, viva in _backends_app(cur))   # ...y "nada peligroso": retornaba aqui
+        mutar_sucursal(a, EMPRESA_A, "tardia-" + uuid.uuid4().hex[:6], "Tardia")   # commit=True
+        assert _cuenta_tardias() == 1, "la idle preexistente escribio tras la barrera vieja"
+    finally:
+        a.close(); _reabrir()
+
+
+def test_drenaje_termina_tambien_las_sesiones_idle(base):
+    import uuid
+    from comun import EMPRESA_A, mutar_sucursal
+    a = psycopg.connect(dsn_rol("lumin_app"))
+    try:
+        assert sesiones_app_abiertas() == 1
+        drenar_lumin_app(timeout_s=0.1)
+        assert sesiones_app_abiertas() == 0
+        with pytest.raises(psycopg.OperationalError):
+            mutar_sucursal(a, EMPRESA_A, "tardia-" + uuid.uuid4().hex[:6], "Tardia")
+        assert _cuenta_tardias() == 0
+        with pytest.raises(psycopg.OperationalError):                 # y no puede volver a entrar
+            psycopg.connect(dsn_rol("lumin_app"), connect_timeout=2)
+    finally:
+        try:
+            a.close()
+        except Exception:  # noqa: BLE001
+            pass
+        _reabrir()
+
+
+def test_peticion_admitida_antes_de_la_barrera_que_empieza_su_sql_despues(base):
+    """Un hilo HTTP ya tiene conexion del pool y 'esta pensando' cuando cae la
+    barrera; cuando intenta su primer SQL, la sesion ya no existe."""
+    import threading, uuid
+    from comun import EMPRESA_A, mutar_sucursal
+    a = psycopg.connect(dsn_rol("lumin_app"))
+    barrera = threading.Event(); res = {}
+
+    def peticion_lenta():
+        barrera.wait(5)                                   # "procesando" sin haber tocado la base
+        try:
+            mutar_sucursal(a, EMPRESA_A, "tardia-" + uuid.uuid4().hex[:6], "Tardia")
+            res["commit"] = True
+        except Exception as e:  # noqa: BLE001
+            res["error"] = type(e).__name__
+    h = threading.Thread(target=peticion_lenta); h.start()
+    try:
+        drenar_lumin_app(timeout_s=0.1)
+        barrera.set(); h.join(5)
+        assert res.get("commit") is not True and res.get("error"), res
+        assert _cuenta_tardias() == 0
+    finally:
+        try:
+            a.close()
+        except Exception:  # noqa: BLE001
+            pass
+        _reabrir()
+
+
+def test_drenaje_no_toca_otros_roles(base):
+    """Acotado al rol de aplicacion: el espejo y la migracion siguen conectados."""
+    e = psycopg.connect(dsn_rol("lumin_espejo"))
+    try:
+        drenar_lumin_app(timeout_s=0.1)
+        assert e.execute("SELECT 1").fetchone()[0] == 1
+        psycopg.connect(dsn_rol("lumin_migracion"), connect_timeout=2).close()
+    finally:
+        e.close(); _reabrir()

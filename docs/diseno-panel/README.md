@@ -43,6 +43,16 @@ oscuro de la TV, que es otra pieza.
   entrega medibles. "Reproducciones confirmadas" en Biblioteca depende de la
   propuesta 7 (confirmación desde la TV), aún no implementada: es diseño.
 
+## Revisión 3 (respuesta a "Panel y RF-26" del informe 23)
+
+La semántica completa de destinos, grupos, prioridad, confirmación de
+reemplazo, contrato de datos y estados de entrega está en
+`docs/coordinacion/22-rf26-destinos-de-lista.md` (con las decisiones D8 y
+D9). El prototipo muestra ahora la regla de prioridad, la prioridad editable
+por grupo, el cuadro de confirmación de reemplazo con pantallas únicas y los
+estados "recibida" y "reproduciendo" etiquetados como diseño hasta B5b y la
+propuesta 7. Sigue siendo una propuesta; nada de esto está implementado.
+
 ## Supuestos que Adrián debe confirmar o corregir
 
 1. La recepcionista usa el panel desde el **celular** para Mostrar ahora y
