@@ -1,6 +1,8 @@
 # QA de LUMIN TV
 
-- [Último informe: 050cc2d](informes/25-qa-B3-rev7-RF26-050cc2d.md).
+- [Último informe: 14f0bc5](informes/26-qa-B3-rev8-RF26-14f0bc5.md).
+- [Evidencia R9 reproducida por Codex](evidencia/revision-r9-14f0bc5/README.md).
+- [Informe previo: 050cc2d](informes/25-qa-B3-rev7-RF26-050cc2d.md).
 - [Evidencia R8 reproducida por Codex](evidencia/revision-r8-050cc2d/README.md).
 - [Informe previo: a0583df](informes/24-qa-B3-rev6-RF26-a0583df.md).
 - [Evidencia R7 reproducida por Codex](evidencia/revision-r7-a0583df/README.md).

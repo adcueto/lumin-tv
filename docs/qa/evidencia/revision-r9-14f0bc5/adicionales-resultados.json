@@ -1,0 +1,32 @@
+{
+  "consultas_sin_cambio": {
+    "env_rec": [
+      [
+        2,
+        1
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        4,
+        3
+      ]
+    ],
+    "filas_historial": 4
+  },
+  "borrar_lista_referenciada": {
+    "sqlstate": "23502",
+    "mensaje": "null value in column \"id\" of relation \"pantalla_e\" violates not-null constraint",
+    "columna": "id"
+  },
+  "entrega_concurrente": {
+    "primera": 1,
+    "segunda": {
+      "sqlstate": "23505",
+      "mensaje": "duplicate key value violates unique constraint \"pantalla_entrega_pkey\""
+    },
+    "bloqueo_observado": true
+  }
+}

@@ -10,8 +10,8 @@ Raíz: `C:/Users/adcueto/Claude/lumin-tv`. Consolidación documental local: 2026
 - [Fuente editable de seguimiento](coordinacion/backlog.json); regenerar las vistas con `python docs/coordinacion/actualizar_tablero.py`.
 
 - [Instrucciones comunes](../AGENTS.md) y [entrada Claude](../CLAUDE.md).
-- [Coordinación vigente v1.7](coordinacion/16-coordinacion-agentes.md): roles, tablero, decisiones y formato de mensajes.
-- [Último informe QA registrado](qa/informes/25-qa-B3-rev7-RF26-050cc2d.md).
+- [Coordinación vigente v1.8](coordinacion/16-coordinacion-agentes.md): roles, tablero, decisiones y formato de mensajes.
+- [Último informe QA registrado](qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md).
 
 ## Requisitos recientes
 

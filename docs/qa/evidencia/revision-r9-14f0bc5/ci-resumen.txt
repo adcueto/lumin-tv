@@ -1,0 +1,6 @@
+roku 5.2 · brs + bsc	arneses brs (CacheTask.brs y MainScene.brs reales)	2026-09-19T09:51:25.1077098Z RESUMEN: 42 comprobaciones, 0 fallos
+roku 5.2 · brs + bsc	arneses brs (CacheTask.brs y MainScene.brs reales)	2026-09-19T09:51:25.1088344Z RESUMEN: 21 comprobaciones, 0 fallos
+ensayos de diseño B3 · PostgreSQL 16	pytest servidor/ensayos_b3	2026-09-19T09:51:46.6454206Z 61 passed in 13.06s
+ensayos de diseño B3 · PostgreSQL 16	sin omitidos (61 ensayos deben ejecutarse)	2026-09-19T09:51:46.7408822Z ensayos-b3-junit.xml: total=61 ejecutadas=61 omitidas=0 fallos=0 errores=0
+servidor 6.10 · pytest	pytest servidor/tests	2026-09-19T09:51:23.8021383Z 28 passed in 12.17s
+servidor 6.10 · pytest	sin omitidos	2026-09-19T09:51:23.8708224Z servidor-junit.xml: total=28 ejecutadas=28 omitidas=0 fallos=0 errores=0

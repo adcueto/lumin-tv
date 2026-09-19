@@ -1,8 +1,8 @@
 # Requisitos de producto — LUMIN TV
 
-Fecha: 2026-09-19 · Versión: 1.6 · Responsable: 00 — Coordinación y QA.
+Fecha: 2026-09-19 · Versión: 1.7 · Responsable: 00 — Coordinación y QA.
 
-Último SHA revisado: `050cc2d090b58f4d1a7b1673c830111a347b3768`. No es una consulta en vivo a GitHub.
+Último SHA revisado: `14f0bc51b5f7330a046d99ac870036747366c586`. No es una consulta en vivo a GitHub.
 
 ## Objetivo y alcance
 
@@ -20,7 +20,7 @@ Instrucciones actuales del propietario y documento común prevalecen sobre el br
 - Conversación del propietario: preservar operación, navegación por secciones, correo por código, PostgreSQL, separación de SaaS futuro y exclusión de editor/plantillas.
 - [Brief íntegro](../coordinacion/08-encargo-original.txt): requisitos amplios y propuestas comerciales históricas.
 - [Plan por bloques](../coordinacion/10-diagnostico-y-plan-modernizacion.md): antecedentes B1–B8; las revisiones posteriores prevalecen en contradicciones (por ejemplo, medios permanecen locales en B3).
-- [Coordinación vigente](../coordinacion/16-coordinacion-agentes.md) y [último QA](../qa/informes/25-qa-B3-rev7-RF26-050cc2d.md): alcance y limitaciones.
+- [Coordinación vigente](../coordinacion/16-coordinacion-agentes.md) y [último QA](../qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md): alcance y limitaciones.
 - Estado de implementación únicamente en el [semáforo](../coordinacion/18-semaforo.md); no duplicarlo en los requisitos.
 
 ## Exclusiones y propuestas aún no aprobadas

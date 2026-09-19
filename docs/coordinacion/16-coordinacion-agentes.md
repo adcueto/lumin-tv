@@ -1,6 +1,6 @@
 # LUMIN TV — documento común de coordinación de agentes
 
-**ID:** LTV-COORD-001 · **Versión:** 1.7 · **Fecha:** 2026-09-19.
+**ID:** LTV-COORD-001 · **Versión:** 1.8 · **Fecha:** 2026-09-19.
 **Propietario:** Adrián Pérez Cueto. **Responsable del documento:** Codex, coordinación y QA.
 **Finalidad:** que cada agente conozca el alcance, qué versión se está revisando, quién hace cada trabajo y cómo entregar evidencia al siguiente responsable.
 
@@ -77,7 +77,7 @@ Desde v1.2, **el estado de tareas se mantiene únicamente en backlog.json**. No 
 - [Requisitos del producto](../requisitos/REQUISITOS-PRODUCTO.md): catálogo RF/RNF y trazabilidad.
 - [Fuente editable](backlog.json) y [generador de vistas](actualizar_tablero.py).
 
-Último corte de evidencia: 2026-09-19, SHA 050cc2d090b58f4d1a7b1673c830111a347b3768, informe QA25. PG55 local y CI verificados; producto/panel sin cambios por hashes. Drenaje y relaciones por sucursal cerrados; RF26-QA-02/03 y DOC-R7-01 pendientes. Documentación local, sin push.
+Último corte de evidencia: 2026-09-19, SHA 14f0bc51b5f7330a046d99ac870036747366c586, informe QA26. PG61 local y CI verificados; cierres de QA25 y tres hallazgos nuevos RF26-QA-04/05/06. c42770f publicado en main; despliegue reportado por Adrián con servicio active, app Roku aún anterior. Esta revisión documental queda local, sin push nuevo.
 
 00 actualiza la fuente después de evaluar una entrega; incrementa versión/fecha, registra evidencia y ejecuta `python docs/coordinacion/actualizar_tablero.py` desde la raíz. El generador valida IDs, cobertura y dependencias y produce las tres vistas Markdown. 01/02/03 proponen cambios de estado con entrega y evidencia; no cambian un dictamen ajeno. Un nuevo SHA requiere revisar qué tareas afecta, no cerrar todas automáticamente.
 
@@ -192,7 +192,8 @@ Usa PARA / DE / BLOQUE / ESTADO en tus entregas y responde por ID de hallazgo.
 
 ## 11. Índice de la revisión actual e historial
 
-- Actual: [QA B3 rev7 / RF-26](../qa/informes/25-qa-B3-rev7-RF26-050cc2d.md).
+- Actual: [QA B3 rev8 / RF-26](../qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md).
+- Histórico: [QA B3 rev7 / RF-26](../qa/informes/25-qa-B3-rev7-RF26-050cc2d.md).
 - Histórico: [QA B3 rev6 / RF-26](../qa/informes/24-qa-B3-rev6-RF26-a0583df.md).
 - Histórico: [QA B3 rev5 / B5a R2 / panel rev2](../qa/informes/23-qa-B3-rev5-B5a-R2-3a1eaf9.md).
 - Histórico: [QA B3 rev4 / B5a / panel](../qa/informes/22-qa-B3-rev4-B5a-1f7782e.md).
@@ -201,7 +202,7 @@ Usa PARA / DE / BLOQUE / ESTADO en tus entregas y responde por ID de hallazgo.
 - Previa: [QA R2 / B3](../qa/informes/14-qa-R2-y-diseno-B3-5c96845.md).
 - [QA B2 inicial](../qa/informes/13-qa-B2-0c00f35.md).
 - [QA B1 inicial](../qa/informes/12-qa-B1-ceadf1d.md).
-- Diseño revisado: [copia rev7 por SHA](../arquitectura/referencias/13-diseno-B3-postgresql-rev7-050cc2d.md); original en el commit candidato.
+- Diseño revisado: [copia rev8 por SHA](../arquitectura/referencias/13-diseno-B3-postgresql-rev8-14f0bc5.md); original en el commit candidato.
 - Evidencia: [índice QA](../qa/README.md).
 - Antecedentes: [documentación inicial](historico-codex/README.md); no desplaza el alcance vigente.
 
@@ -209,6 +210,7 @@ Usa PARA / DE / BLOQUE / ESTADO en tus entregas y responde por ID de hallazgo.
 
 | Versión | Fecha | Cambio | Autor |
 |---|---|---|---|
+| 1.8 | 2026-09-19 | QA26 14f0bc5: PG61 y CI; cierres de QA25 y nuevas correcciones en creación/borrado de entregas. Despliegue c42770f reportado; Roku físico pendiente. | Codex |
 | 1.7 | 2026-09-19 | QA25 050cc2d: PG55 y CI; cierres de drenaje y sucursal, confirmación/historial y documento de movimiento pendientes. | Codex |
 | 1.6 | 2026-09-19 | QA24 a0583df: cierre idle, alcance por base y RF-26 con correcciones; PG50/UI33/CI verificados. D8/D9 pendientes. | Codex |
 | 1.5 | 2026-09-19 | QA 3a1eaf9: cuatro cierres acotados, drenaje idle pendiente, CI y anchos del panel comprobados; protocolo físico y RF-26 pendientes. | Codex |

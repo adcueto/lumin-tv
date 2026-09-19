@@ -1,8 +1,8 @@
 # Backlog maestro — LUMIN TV
 
-Fecha: 2026-09-19 · Versión: 1.6 · Responsable: 00 — Coordinación y QA.
+Fecha: 2026-09-19 · Versión: 1.7 · Responsable: 00 — Coordinación y QA.
 
-Último SHA revisado: `050cc2d090b58f4d1a7b1673c830111a347b3768`. No es una consulta en vivo a GitHub.
+Último SHA revisado: `14f0bc51b5f7330a046d99ac870036747366c586`. No es una consulta en vivo a GitHub.
 
 ## Cómo usarlo
 
@@ -229,11 +229,11 @@ Prioridades: P0 = integridad/seguridad o condición de cierre del bloque aplicab
 
 **Requisitos:** [RNF-10](../requisitos/REQUISITOS-PRODUCTO.md#rnf-10), [RNF-04](../requisitos/REQUISITOS-PRODUCTO.md#rnf-04).
 
-**Aceptación:** PG55 ejecutado localmente, sin omitidos; CI35434726333 del SHA exacto: 28 servidor/55 PG/42+21 Roku/compilación. Producto y panel sin cambios, hashes verificados.
+**Aceptación:** PG61 ejecutado por Codex, sin omitidos. CI35435820477: 28 servidor/61 PG/42+21 Roku/compilación. Producto idéntico a c42770f por hashes. Pruebas verdes no cierran los tres contraejemplos adicionales de QA26.
 
-**Evidencia/referencia:** [docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md](../qa/informes/25-qa-B3-rev7-RF26-050cc2d.md)
+**Evidencia/referencia:** [docs/qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md](../qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md)
 
-**SHA al que se refiere esa evidencia:** `050cc2d090b58f4d1a7b1673c830111a347b3768`.
+**SHA al que se refiere esa evidencia:** `14f0bc51b5f7330a046d99ac870036747366c586`.
 
 <a id="bl-009"></a>
 
@@ -365,11 +365,11 @@ Prioridades: P0 = integridad/seguridad o condición de cierre del bloque aplicab
 
 **Aceptación:** Dictamen documental por versión/SHA; cero hallazgos críticos de diseño abiertos; implementación requiere encargo posterior.
 
-**Evidencia/referencia:** [docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md](../qa/informes/25-qa-B3-rev7-RF26-050cc2d.md)
+**Evidencia/referencia:** [docs/qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md](../qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md)
 
-**Hallazgo:** Rev7 revisada: cierres de drenaje/sucursal; RF26-QA-02/03 y DOC-R7-01 pendientes. Diseño global no aprobado..
+**Hallazgo:** Rev8 revisada; hallazgos de QA25 cerrados en alcance. RF26-QA-04/05/06 pendientes; no aprobación global de B3..
 
-**SHA al que se refiere esa evidencia:** `050cc2d090b58f4d1a7b1673c830111a347b3768`.
+**SHA al que se refiere esa evidencia:** `14f0bc51b5f7330a046d99ac870036747366c586`.
 
 <a id="bl-017"></a>
 
@@ -1229,13 +1229,13 @@ Prioridades: P0 = integridad/seguridad o condición de cierre del bloque aplicab
 
 **Requisitos:** [RF-26](../requisitos/REQUISITOS-PRODUCTO.md#rf-26), [RF-06](../requisitos/REQUISITOS-PRODUCTO.md#rf-06), [RF-04](../requisitos/REQUISITOS-PRODUCTO.md#rf-04).
 
-**Aceptación:** Preservar FK por sucursal; definir identidad de asignación y ACK vigente; historial/confirmaciones aislados por empresa con RLS ensayado; movimiento transaccional de relaciones y desempate estable de grupos.
+**Aceptación:** Numeración concurrente segura por pantalla; generación estable entre latidos sin cambios y distinta en L1→L2→L1; borrado coherente conservando ID de pantalla. Preservar aislamiento por empresa/sucursal, ACK monótono y movimiento transaccional.
 
-**Evidencia/referencia:** [docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md](../qa/informes/25-qa-B3-rev7-RF26-050cc2d.md)
+**Evidencia/referencia:** [docs/qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md](../qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md)
 
-**Hallazgo:** RF26-QA-01 cerrado. RF26-QA-02: falta generación de asignación y control de ACK retrasado; RF26-QA-03: historial sin empresa_id y confirmación cruzada. DOC-R7-01: movimiento requiere limpieza explícita, no cascada automática..
+**Hallazgo:** QA26 cierra RF26-QA-02/03 y DOC-R7-01. Nuevos: RF26-QA-04 max(seq)+1 colisiona entre conexiones; RF26-QA-05 nueva entrega por consulta mantiene recibida atrasada; RF26-QA-06 SET NULL compuesto intenta anular pantalla.id al borrar lista..
 
-**SHA al que se refiere esa evidencia:** `050cc2d090b58f4d1a7b1673c830111a347b3768`.
+**SHA al que se refiere esa evidencia:** `14f0bc51b5f7330a046d99ac870036747366c586`.
 
 <a id="bl-077"></a>
 

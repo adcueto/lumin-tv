@@ -1,10 +1,10 @@
 # Semáforo del proyecto — LUMIN TV
 
-Fecha: 2026-09-19 · Versión: 1.6 · Responsable: 00 — Coordinación y QA.
+Fecha: 2026-09-19 · Versión: 1.7 · Responsable: 00 — Coordinación y QA.
 
-Último SHA revisado: `050cc2d090b58f4d1a7b1673c830111a347b3768`. No es una consulta en vivo a GitHub.
+Último SHA revisado: `14f0bc51b5f7330a046d99ac870036747366c586`. No es una consulta en vivo a GitHub.
 
-**Estado global:** 🔴 Drenaje por base y relaciones RF-26 por sucursal cerrados en alcance ensayado. Pendientes RF26-QA-02 (generación de entrega), RF26-QA-03 (historial/empresa) y precisión DOC-R7-01. PG55 y CI verificados; físico y decisiones pendientes.
+**Estado global:** 🔴 QA26: RF26-QA-02/03 y DOC-R7-01 cerrados en alcance ensayado. Nuevos RF26-QA-04/05/06: concurrencia, identidad estable entre consultas y borrado de lista. PG61 local y CI verdes; B3 diseño y decisiones/físico pendientes.
 
 ## Leyenda
 
@@ -58,7 +58,7 @@ La señal es la condición más restrictiva registrada en cada bloque; leer los 
 | [BL-004](17-backlog-maestro.md#bl-004) — Regresión caché, cuarentena, comando y datos obsoletos | 01 + 00 | Repetir todos los recorridos señalados en informes B1 y sus correcciones sobre un SHA; identificar compilación y límites. |
 | [BL-011](17-backlog-maestro.md#bl-011) — Completar matriz RLS, marcas y rol del espejo | 01 | DDL/roles/políticas permiten mutación+marca, auditoría, espejo y backup; controles negativos impiden cruce. |
 | [BL-016](17-backlog-maestro.md#bl-016) — Revisar diseño B3 corregido y fijar aceptación | 00 | Dictamen documental por versión/SHA; cero hallazgos críticos de diseño abiertos; implementación requiere encargo posterior. |
-| [BL-076](17-backlog-maestro.md#bl-076) — Diseñar destinos y grupos de TVs; impacto en B3 | 01; revisa 00 | Preservar FK por sucursal; definir identidad de asignación y ACK vigente; historial/confirmaciones aislados por empresa con RLS ensayado; movimiento transaccional de relaciones y desempate estable de grupos. |
+| [BL-076](17-backlog-maestro.md#bl-076) — Diseñar destinos y grupos de TVs; impacto en B3 | 01; revisa 00 | Numeración concurrente segura por pantalla; generación estable entre latidos sin cambios y distinta en L1→L2→L1; borrado coherente conservando ID de pantalla. Preservar aislamiento por empresa/sucursal, ACK monótono y movimiento transaccional. |
 | [BL-081](17-backlog-maestro.md#bl-081) — Recarga Roku con playlist idéntica | 01; revisa 00 | Recargar reinicia sin depender de JSON distinto; 21 comprobaciones aisladas pasan. Completar F23 físico con protocolo de corte realizable y build 62. |
 
 ## Decisiones del propietario
@@ -85,7 +85,7 @@ La señal es la condición más restrictiva registrada en cada bloque; leer los 
 | [BL-003](17-backlog-maestro.md#bl-003) | Reconciliaciones idénticas no reactivan sin_espacio; cambio efectivo sí. | [docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md](../qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md) |
 | [BL-006](17-backlog-maestro.md#bl-006) | Diez pruebas originales pasan ahora con pytest dentro de las 21 de servidor en ce4716f; sin cambios del producto B2 desde revisión previa. | [docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md](../qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md) |
 | [BL-007](17-backlog-maestro.md#bl-007) | Tres funciones HEAD pasan con las diez previas; tamaños/cabeceras/404 y ausencia de incremento comprobados. | [docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md](../qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md) |
-| [BL-008](17-backlog-maestro.md#bl-008) | PG55 ejecutado localmente, sin omitidos; CI35434726333 del SHA exacto: 28 servidor/55 PG/42+21 Roku/compilación. Producto y panel sin cambios, hashes verificados. | [docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md](../qa/informes/25-qa-B3-rev7-RF26-050cc2d.md) |
+| [BL-008](17-backlog-maestro.md#bl-008) | PG61 ejecutado por Codex, sin omitidos. CI35435820477: 28 servidor/61 PG/42+21 Roku/compilación. Producto idéntico a c42770f por hashes. Pruebas verdes no cierran los tres contraejemplos adicionales de QA26. | [docs/qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md](../qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md) |
 | [BL-009](17-backlog-maestro.md#bl-009) | Protocolo cubre A reserva/B confirma/espejo/A confirma, sin tercer cambio; marcas pendientes y snapshot coherente. | [docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md](../qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md) |
 | [BL-010](17-backlog-maestro.md#bl-010) | Contrato de sesiones/rollback y barrera completa ensayados en PG55: revocadas no se reactivan, idle/peticiones tardías no escriben tras drenaje y otra base sobrevive. No implementa rollback productivo ni resuelve decisión D7. | [docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md](../qa/informes/25-qa-B3-rev7-RF26-050cc2d.md) |
 | [BL-012](17-backlog-maestro.md#bl-012) | Ocho pruebas del inventario pasan: casos originales de ruta/archivos/JSON/forma raíz, vacío y alias. No equivale a validación exhaustiva de todos los campos anidados. | [docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md](../qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md) |

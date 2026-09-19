@@ -1,8 +1,8 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "fecha": "2026-09-19",
-  "ultimo_sha_revisado": "050cc2d090b58f4d1a7b1673c830111a347b3768",
-  "informe_qa": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
+  "ultimo_sha_revisado": "14f0bc51b5f7330a046d99ac870036747366c586",
+  "informe_qa": "docs/qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md",
   "alcance": "Seguimiento documental; no activa desarrollo, producción ni comerciales diferidos.",
   "prioridades": {
     "P0": "Integridad/seguridad o condición de cierre del bloque aplicable",
@@ -458,12 +458,12 @@
         "BL-002",
         "BL-003"
       ],
-      "aceptacion": "PG55 ejecutado localmente, sin omitidos; CI35434726333 del SHA exacto: 28 servidor/55 PG/42+21 Roku/compilación. Producto y panel sin cambios, hashes verificados.",
-      "evidencia": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
+      "aceptacion": "PG61 ejecutado por Codex, sin omitidos. CI35435820477: 28 servidor/61 PG/42+21 Roku/compilación. Producto idéntico a c42770f por hashes. Pruebas verdes no cierran los tres contraejemplos adicionales de QA26.",
+      "evidencia": "docs/qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md",
       "hallazgo": "",
       "alcance": "actual",
       "fecha_objetivo": null,
-      "sha_evidencia": "050cc2d090b58f4d1a7b1673c830111a347b3768"
+      "sha_evidencia": "14f0bc51b5f7330a046d99ac870036747366c586"
     },
     {
       "id": "BL-009",
@@ -630,11 +630,11 @@
         "BL-076"
       ],
       "aceptacion": "Dictamen documental por versión/SHA; cero hallazgos críticos de diseño abiertos; implementación requiere encargo posterior.",
-      "evidencia": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
-      "hallazgo": "Rev7 revisada: cierres de drenaje/sucursal; RF26-QA-02/03 y DOC-R7-01 pendientes. Diseño global no aprobado.",
+      "evidencia": "docs/qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md",
+      "hallazgo": "Rev8 revisada; hallazgos de QA25 cerrados en alcance. RF26-QA-04/05/06 pendientes; no aprobación global de B3.",
       "alcance": "actual",
       "fecha_objetivo": null,
-      "sha_evidencia": "050cc2d090b58f4d1a7b1673c830111a347b3768"
+      "sha_evidencia": "14f0bc51b5f7330a046d99ac870036747366c586"
     },
     {
       "id": "BL-017",
@@ -1945,12 +1945,12 @@
       "prioridad": "P1",
       "responsable": "01; revisa 00",
       "dependencias": [],
-      "aceptacion": "Preservar FK por sucursal; definir identidad de asignación y ACK vigente; historial/confirmaciones aislados por empresa con RLS ensayado; movimiento transaccional de relaciones y desempate estable de grupos.",
-      "evidencia": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
-      "hallazgo": "RF26-QA-01 cerrado. RF26-QA-02: falta generación de asignación y control de ACK retrasado; RF26-QA-03: historial sin empresa_id y confirmación cruzada. DOC-R7-01: movimiento requiere limpieza explícita, no cascada automática.",
+      "aceptacion": "Numeración concurrente segura por pantalla; generación estable entre latidos sin cambios y distinta en L1→L2→L1; borrado coherente conservando ID de pantalla. Preservar aislamiento por empresa/sucursal, ACK monótono y movimiento transaccional.",
+      "evidencia": "docs/qa/informes/26-qa-B3-rev8-RF26-14f0bc5.md",
+      "hallazgo": "QA26 cierra RF26-QA-02/03 y DOC-R7-01. Nuevos: RF26-QA-04 max(seq)+1 colisiona entre conexiones; RF26-QA-05 nueva entrega por consulta mantiene recibida atrasada; RF26-QA-06 SET NULL compuesto intenta anular pantalla.id al borrar lista.",
       "alcance": "actual",
       "fecha_objetivo": null,
-      "sha_evidencia": "050cc2d090b58f4d1a7b1673c830111a347b3768"
+      "sha_evidencia": "14f0bc51b5f7330a046d99ac870036747366c586"
     },
     {
       "id": "BL-077",
@@ -2119,5 +2119,5 @@
       "sha_evidencia": "a0583df14a5367f2ac8b33c3c3711fb84373ba65"
     }
   ],
-  "estado_global": "🔴 Drenaje por base y relaciones RF-26 por sucursal cerrados en alcance ensayado. Pendientes RF26-QA-02 (generación de entrega), RF26-QA-03 (historial/empresa) y precisión DOC-R7-01. PG55 y CI verificados; físico y decisiones pendientes."
+  "estado_global": "🔴 QA26: RF26-QA-02/03 y DOC-R7-01 cerrados en alcance ensayado. Nuevos RF26-QA-04/05/06: concurrencia, identidad estable entre consultas y borrado de lista. PG61 local y CI verdes; B3 diseño y decisiones/físico pendientes."
 }
