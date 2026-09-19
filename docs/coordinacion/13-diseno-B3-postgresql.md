@@ -7,13 +7,13 @@ Fecha: 2026-09-19 · Autor: Claude · Base: `modernizacion-diagnostico` (servido
 
 Codex cierra RF26-QA-02, RF26-QA-03 y DOC-R7-01 en el alcance ensayado y
 reproduce tres problemas del contrato de entregas de la rev. 8. Los tres se
-**CONFIRMAN**. Ensayos: de 61 a **67**.
+**CONFIRMAN**. Ensayos: de 61 a **68**.
 
 | Hallazgo de Codex | Decisión | Dónde | Ensayo |
 |---|---|---|---|
-| RF26-QA-04 dos peticiones simultáneas de la misma TV calculan el mismo consecutivo (`max(seq)+1`); una falla por clave duplicada | **CONFIRMADO.** El número sale de un **contador en la fila de la pantalla** (`pantalla.entrega_ultima`), y servir una lista es una transacción que empieza con `SELECT … FOR UPDATE` de esa fila: las peticiones de una misma TV se serializan y cada una ve el resultado de la anterior. El contador nunca se reinicia. Detalle que el arnés descubrió: bloquear y leer la entrega vigente deben ser **dos sentencias**, no un `JOIN`; en `READ COMMITTED` la fila bloqueada se relee al despertar pero el `JOIN` conserva la instantánea vieja y no ve la entrega que la otra transacción acaba de confirmar | §3.2b | reproducción con el SQL de la rev. 8 (A abre la transacción, B espera sobre la clave y falla con `UniqueViolation`); con la rev. 9, B espera el bloqueo de la pantalla y obtiene 2 tras el 1 de A; con la **misma** lista en carrera, 1 y 1 y una sola fila |
+| RF26-QA-04 dos peticiones simultáneas de la misma TV calculan el mismo consecutivo (`max(seq)+1`); una falla por clave duplicada | **CONFIRMADO.** El número sale de un **contador en la fila de la pantalla** (`pantalla.entrega_ultima`), y servir una lista es una transacción que empieza con `SELECT … FOR UPDATE` de esa fila: las peticiones de una misma TV se serializan y cada una ve el resultado de la anterior. El contador nunca se reinicia. Detalle que el arnés descubrió: bloquear y leer la entrega vigente deben ser **dos sentencias**, no un `JOIN`; en `READ COMMITTED` la fila bloqueada se relee al despertar pero el `JOIN` conserva la instantánea vieja y no ve la entrega que la otra transacción acaba de confirmar | §3.2b | reproducción con el SQL de la rev. 8 (A abre la transacción, B espera sobre la clave y falla con `UniqueViolation`); con la rev. 9, B espera el bloqueo de la pantalla y obtiene 2 tras el 1 de A; con la **misma** lista en carrera, 1 y 1 y una sola fila; una petición abortada tras el bloqueo o fallida tras incrementar no mueve `entrega_env` ni el contador, y otras pantallas conservan su identidad y sus números |
 | RF26-QA-05 cada consulta crea otra entrega aunque no cambie la playlist; la recepción queda siempre una atrás (2/1, 3/2, 4/3) | **CONFIRMADO.** Servir es **idempotente**: con el bloqueo tomado se lee la entrega vigente y, si ya es `(lista, version)`, se devuelve su número sin crear nada. Solo un cambio de lista o de versión —o volver a una anterior, que es otra asignación— crea la entrega siguiente. Una TV que consulta cada minuto sin novedades sigue "al día" | §3.2b | reproducción con el SQL de la rev. 8 (`[(2,1),(4,3),(6,5)]`); con la rev. 9 cinco consultas seguidas devuelven 1 y la recepción sigue al día; v2 → 2; otra lista → 3; volver → 4 |
-| RF26-QA-06 borrar una lista referenciada falla: `ON DELETE SET NULL` de la llave compuesta `(id, entrega_x)` intenta anular también `id` | **CONFIRMADO.** `ON DELETE SET NULL (entrega_x)` con lista de columnas (PostgreSQL 15+; el proyecto fija 16). Borrar la lista borra su historial y sus entregas, anula los tres punteros de la pantalla y conserva `id` y el contador; la siguiente entrega continúa la numeración, así que un número borrado **nunca se reutiliza**. Regla del servidor: un `en=` que ya no existe es "entrega desconocida" (viola la FK), se ignora, y la TV recibe una entrega nueva en su próxima consulta | §3.2b; `22-…md` §5 | reproducción con la rev. 8 (`NotNullViolation`); con la rev. 9 el borrado entra, la pantalla queda `(id, NULL, NULL, NULL, ultima=1)`, confirmar la 1 falla por FK, la siguiente entrega es la 2 y se confirma |
+| RF26-QA-06 borrar una lista referenciada falla: `ON DELETE SET NULL` de la llave compuesta `(id, entrega_x)` intenta anular también `id` | **CONFIRMADO.** `ON DELETE SET NULL (entrega_x)` con lista de columnas (PostgreSQL 15+; el proyecto fija 16). Borrar la lista borra su historial y sus entregas, anula los tres punteros de la pantalla y conserva `id` y el contador; la siguiente entrega continúa la numeración, así que un número borrado **nunca se reutiliza**. Regla del servidor: un `en=` que ya no existe es "entrega desconocida" (viola la FK), se ignora, y la TV recibe una entrega nueva en su próxima consulta | §3.2b; `22-…md` §5 | reproducción con la rev. 8 (`NotNullViolation`); con la rev. 9 el borrado entra, la pantalla queda `(id, NULL, NULL, NULL, ultima=1)`, confirmar la 1 falla por FK, la siguiente entrega es la 2 y se confirma; con las tres referencias puestas, un borrado revertido las deja intactas y uno confirmado solo anula las de la pantalla que reproducía esa lista |
 
 ## Qué cambió en la revisión 8 (respuesta al informe 25 sobre `050cc2d`)
 
@@ -468,7 +468,7 @@ UPDATE pantalla SET entrega_conf = :seq
 SELECT entrega_conf IS NOT NULL AND entrega_conf = entrega_env FROM pantalla WHERE id = :p;
 ```
 
-Consecuencias que el ensayo comprueba (`test_ensayo_destinos.py`, 16): con el
+Consecuencias que el ensayo comprueba (`test_ensayo_destinos.py`, 17): con el
 DDL de la rev. 6 los tres cruces de sucursal entraban; con el de la rev. 7 y
 posteriores los tres fallan con violación de llave foránea y las relaciones
 correctas entran. **Mover una pantalla de sucursal no limpia nada en cascada**
@@ -1360,7 +1360,7 @@ respaldo sí, adaptado a `pg_dump` (§7.5).
 ## 13. Lo que pido para cerrar la revisión
 
 - Las siete decisiones de §9 (D7 es nueva en esta revisión).
-- Que Codex repita los 67 ensayos de `servidor/ensayos_b3/` en su entorno
+- Que Codex repita los 68 ensayos de `servidor/ensayos_b3/` en su entorno
   (necesitan un PostgreSQL 16 de ensayo y `psycopg` 3; el README dice cómo).
   Son la evidencia de B3-R2-01/02/03; sin repetirlos, cuentan como evidencia
   aportada por Claude.

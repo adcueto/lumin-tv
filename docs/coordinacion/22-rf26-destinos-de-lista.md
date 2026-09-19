@@ -9,7 +9,7 @@ pantalla (no solo el par), el historial de versiones es por empresa, y mover una
 pantalla exige limpiar sus relaciones (la base no lo hace en cascada); rev. 6
 (2026-09-19) responde al informe 26: servir es idempotente y serializado por
 pantalla, y borrar una lista no rompe las pantallas que la reproducían. Ensayado en
-`servidor/ensayos_b3/test_ensayo_destinos.py` (16).
+`servidor/ensayos_b3/test_ensayo_destinos.py` (17).
 
 ## 1. Qué pide RF-26
 

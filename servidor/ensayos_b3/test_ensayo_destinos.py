@@ -710,3 +710,40 @@ def test_rev9_borrar_lista_anula_solo_las_entregas_y_no_reutiliza_numeros(base):
         assert entregar(c, TV_PLAZA, LISTA_JURI) == 2
         assert c.execute(SQL_CONFIRMAR, {"p": TV_PLAZA, "seq": 2}).rowcount == 1
         assert c.execute(SQL_AL_DIA, (TV_PLAZA,)).fetchone()[0] is True
+
+
+def test_rev9_abortar_y_revertir_no_dejan_punteros_incorrectos(base):
+    """Criterios de aceptacion de RF26-QA-04 y RF26-QA-06 (informe 26): una
+    peticion abortada a medias no mueve entrega_env ni gasta el contador; un
+    borrado de lista que se revierte deja las tres referencias intactas; y
+    nada de esto toca la identidad ni los numeros de OTRAS pantallas."""
+    montar(DDL_REV9)
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        assert entregar(c, TV_PLAZA, LISTA_PLAZA) == 1
+        assert entregar(c, TV_JURI, LISTA_JURI) == 1
+        c.execute("UPDATE pantalla_e SET entrega_rec = 1, entrega_conf = 1 WHERE id IN (%s, %s)", (TV_PLAZA, TV_JURI))
+        def foto(tv):
+            return c.execute("SELECT id, entrega_ultima, entrega_env, entrega_rec, entrega_conf FROM pantalla_e WHERE id = %s", (tv,)).fetchone()
+        antes = (foto(TV_PLAZA), foto(TV_JURI))
+        # 1) peticion abortada despues de tomar el bloqueo (la costura lanza): nada cambia
+        class Corte(Exception):
+            pass
+        def cortar():
+            raise Corte()
+        with pytest.raises(Corte):
+            entregar(c, TV_PLAZA, LISTA_JURI, tras_bloquear=cortar)
+        # 2) peticion que falla dentro (lista de otra empresa) tras haber incrementado el contador: revierte entera
+        with pytest.raises(errors.ForeignKeyViolation):
+            entregar(c, TV_PLAZA, LISTA_B)
+        assert (foto(TV_PLAZA), foto(TV_JURI)) == antes, "ni entrega_env ni el contador se movieron"
+        # 3) borrado de lista revertido: las tres referencias siguen apuntando a la entrega 1
+        with pytest.raises(Corte):
+            with c.transaction():
+                c.execute("DELETE FROM lista_e WHERE id = %s", (LISTA_PLAZA,))
+                assert foto(TV_PLAZA)[2:] == (None, None, None)              # dentro: ya anuladas
+                raise Corte()
+        assert (foto(TV_PLAZA), foto(TV_JURI)) == antes
+        # 4) borrado confirmado: solo la pantalla que reproducia esa lista pierde sus punteros
+        c.execute("DELETE FROM lista_e WHERE id = %s", (LISTA_PLAZA,))
+        assert foto(TV_PLAZA) == (TV_PLAZA, 1, None, None, None)
+        assert foto(TV_JURI) == antes[1]
