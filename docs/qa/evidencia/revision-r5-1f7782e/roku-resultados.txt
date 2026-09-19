@@ -1,0 +1,68 @@
+interprete: C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r4-ce4716f\deps\node\node_modules\.bin\brs.cmd
+objetivo  : C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r5-1f7782e\roku-app\components\CacheTask.brs
+
+== R3-B1-01 reintento autonomo a los 30 s sin nuevos mensajes
+  ok    primer intento inmediato
+  ok    tras fallar, m.activo queda vacio
+  ok    la URL vuelve a la cola (antes: rechazada por creerse activa)
+  ok    milisegundosHastaElSiguiente = 5000, no -1 (antes: -1, espera infinita); fue 5000
+  ok    a los 29.999 s todavia no reintenta
+  ok    a los 30 s reintenta sin que llegue ningun mensaje
+
+== R3-B1-01 secuencia 30/60/120/240/300 s, seis intentos, luego agotado
+  ok    exactamente 6 intentos; fueron 6
+  ok    instantes 0,30,90,210,450,750 s; fueron 0,30,90,210,450,750
+  ok    estado final: terminal 'agotado'
+  ok    nada pendiente: el bucle esperaria un mensaje
+
+== agotado se reanima al reconectar, no antes
+  ok    reconciliar con la misma lista no reanima un agotado
+  ok    reconectado: intento inmediato
+  ok    y esta vez queda en cache
+  ok    el registro olvida lo que ya esta en disco
+
+== R2-B1-02 reconciliar durante la descarga: sin duplicar el activo
+  ok    la URL aparece una sola vez en la cola; aparecio 1
+  ok    un solo intento contado
+  ok    reintento programado a 30 s, no inmediato
+  ok    no salta la espera
+  ok    segundo intento a los 30 s
+
+== R2-B1-02 reconciliar con la misma lista conserva intentos y espera
+  ok    dos intentos
+  ok    cinco reconciliaciones identicas: siguen siendo 2 intentos
+  ok    la fecha del reintento no cambia
+  ok    no se lanzo ninguna descarga extra
+
+== R3-B1-02 sin_espacio no se libera con la misma lista
+  ok    queda terminal sin_espacio
+  ok    diez reconciliaciones identicas en 10 min: sigue en 1 intento; fueron 1
+  ok    sigue terminal
+
+== R3-B1-02 sin_espacio se reintenta al cambiar el conjunto de la lista
+  ok    lista distinta: nuevo intento de la URL en sin_espacio
+  ok    y termina en cache
+
+== R3-B1-02 sin_espacio se reintenta si la reconciliacion libero espacio
+  ok    lo no deseado se desalojo
+  ok    espacio liberado de verdad: nuevo intento
+
+== 404 sostenido: un intento, cuarentena de 30 min, luego uno mas
+  ok    29 reconciliaciones en 29 min: un solo intento; fueron 1
+  ok    a los 30 min, un intento mas
+
+== una URL que sale de la lista se olvida y libera su espacio
+  ok    descargado
+  ok    al salir de la lista se borra
+  ok    y se olvida su registro
+
+== B5a vaciar cache: borra medios, conserva la lista guardada y vuelve a bajar
+  ok    los dos medios en cache
+  ok    medios borrados
+  ok    la lista guardada NO se borra
+  ok    registro y cola vacios
+  ok    se anuncia el vaciado y 0 bytes
+  ok    se vuelven a bajar los dos
+  ok    y quedan en cache otra vez
+RESUMEN: 42 comprobaciones, 0 fallos
+

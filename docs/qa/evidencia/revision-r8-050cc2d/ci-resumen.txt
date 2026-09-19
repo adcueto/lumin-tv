@@ -1,0 +1,6 @@
+servidor 6.10 · pytest	pytest servidor/tests	2026-09-19T09:27:31.5335395Z 28 passed in 12.17s
+servidor 6.10 · pytest	sin omitidos	2026-09-19T09:27:31.6027651Z servidor-junit.xml: total=28 ejecutadas=28 omitidas=0 fallos=0 errores=0
+ensayos de diseño B3 · PostgreSQL 16	pytest servidor/ensayos_b3	2026-09-19T09:27:49.6615715Z 55 passed in 12.18s
+ensayos de diseño B3 · PostgreSQL 16	sin omitidos (55 ensayos deben ejecutarse)	2026-09-19T09:27:49.7410942Z ensayos-b3-junit.xml: total=55 ejecutadas=55 omitidas=0 fallos=0 errores=0
+roku 5.2 · brs + bsc	arneses brs (CacheTask.brs y MainScene.brs reales)	2026-09-19T09:27:26.7884844Z RESUMEN: 42 comprobaciones, 0 fallos
+roku 5.2 · brs + bsc	arneses brs (CacheTask.brs y MainScene.brs reales)	2026-09-19T09:27:26.7895973Z RESUMEN: 21 comprobaciones, 0 fallos

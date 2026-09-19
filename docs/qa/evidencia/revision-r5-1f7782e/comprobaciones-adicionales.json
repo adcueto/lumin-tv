@@ -1,0 +1,33 @@
+{
+  "B5A-QA-01": [
+    {
+      "accion": "recargar",
+      "rol": "usuario",
+      "http": 200,
+      "comando_en_playlist": "recargar"
+    },
+    {
+      "accion": "vaciar_cache",
+      "rol": "usuario",
+      "http": 200,
+      "comando_en_playlist": "vaciar_cache"
+    }
+  ],
+  "B5A-QA-02": {
+    "dos_respuestas_http_identicas_tras_recargar": true,
+    "bytes": 328,
+    "limite": "observador Roku revisado por XML y contrato oficial; no TV física"
+  },
+  "B3-R4-01": {
+    "drenaje_retorno": true,
+    "estado_posterior": "idle in transaction",
+    "filas_antes": 0,
+    "filas_despues_commit_tardio": 1
+  },
+  "B3-R4-02": {
+    "publicacion_inicial": true,
+    "repeticion_misma_posesion": false,
+    "estado": "hecho",
+    "archivo_existe": false
+  }
+}

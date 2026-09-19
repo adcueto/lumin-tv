@@ -1,0 +1,22 @@
+{
+  ".github/workflows/verificacion.yml": "700491e9f25c8445db47e19f3ec43a920ff4d0b5dfb868c2a994c7922d55c951",
+  "docs/coordinacion/13-diseno-B3-postgresql.md": "657fca62f36c58272fffa13ad8f99c89d840345e05ff0020fd07b61b0e951a80",
+  "docs/coordinacion/20-entrega-B5a-estado-y-operacion.md": "b2df9ec59425e4f8b3bce272178af9127fbb07acbb0391ded20e1f4a0fefd491",
+  "docs/diseno-panel/README.md": "666c5ca653a0591a332994369f46c1b837c988ed8ddeaa50e5845adbde5d7865",
+  "docs/diseno-panel/capturas/escritorio-listas.png": "06747fb307525a9a6a64142f0abf7bc929a7a7aefcf9598bea315aaf7179fc3b",
+  "docs/diseno-panel/capturas/escritorio-pantallas.png": "285170d1a7d0f6001da8d915fe60036a34c68c0123d64c6cb394da9f06b6cd7f",
+  "docs/diseno-panel/capturas/movil-mostrar.png": "58e5fa0b49104e38b216e2e936c7e3e240dbd1874f044e4ba885ce5bba091fc6",
+  "docs/diseno-panel/comprobar_anchura.py": "8576466ec0ef0ac57f1385454f2a70601ab8da2859d11a305e2aa3181100bc34",
+  "docs/diseno-panel/prototipo.html": "d29e1a21ec7c063492308465fa196e7468766577ef4b157bfa78d35db2c3bbb5",
+  "docs/reproductor-continuidad.md": "7ddb17d9cb9cc37d27bf74a82fce709a1e6260cc81b901be535100be1514b3bc",
+  "roku-app/components/MainScene.brs": "c7cdcf9ab231db35aa4e5c53ed3ba458604276df9ff6c6316a5304cc616c10f7",
+  "roku-app/manifest": "43da5170c92c423d7e56e67e837d8a6cd8da0b9f46ddaf970b4ffa4c5fd03528",
+  "roku-app/pruebas/correr.py": "fa75660f07c261d6ef9bd5aba507744b2f5ba3b158aa2d05d4057c19e07fba07",
+  "roku-app/pruebas/escena.brs": "6d91b7bf4cbe401f27a0539a648e7562eb36992ba7ae30e8eb9c31600fa28b11",
+  "servidor/ensayos_b3/README.md": "5c9e2fcbe699a18d4c5438aaa78481970a461be7126a202c99abf50c89171c4f",
+  "servidor/ensayos_b3/comun.py": "07f0297c7093e37a70ae37a44ba64350176407aa7c842b317fb3526b6af97d3c",
+  "servidor/ensayos_b3/test_ensayo_cola.py": "37889025431504aa0ee4b8bcfc4f5f1018f27afaa68d8f054b8aa10dc8b1017f",
+  "servidor/ensayos_b3/test_ensayo_sesiones.py": "e4c58af5a790a63c04198390a983795e90c649a413007d5393fe36892989d3ca",
+  "servidor/servidor_lumin.py": "b1404d326018b75aef613c55d643997b7270dbbcc2bb1496a781f39fc42b83db",
+  "servidor/tests/test_b5a_estado.py": "faecb4ca7942e06d56880326e6023f1117e52bec3682cd31ef2bc5866904fc9e"
+}

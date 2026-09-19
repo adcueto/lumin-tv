@@ -1,0 +1,78 @@
+{
+  "source_sha256": "6eae0c89fcfd7534c30f4bfdc8765bdc77cbd1b28b7b9fdb95cce0b8ba646599",
+  "python": "3.12.14",
+  "scope": "in-memory handlers; synthetic temporary data; no network; fixed UTC clock",
+  "results": [
+    {
+      "case": "permisos-[]",
+      "observed": [
+        "qa-a",
+        "qa-b"
+      ],
+      "reproduced": true
+    },
+    {
+      "case": "permisos-['missing']",
+      "observed": [
+        "qa-a"
+      ],
+      "reproduced": true
+    },
+    {
+      "case": "playlist-sin-token",
+      "observed": {
+        "status": 200,
+        "has_videos": true
+      },
+      "reproduced": true
+    },
+    {
+      "case": "medio-sin-sesion",
+      "observed": {
+        "status": 200,
+        "synthetic_bytes": true
+      },
+      "reproduced": true
+    },
+    {
+      "case": "contador-404-duplicado",
+      "observed": {
+        "status": 404,
+        "counts": {
+          "2026-09-15": 2
+        }
+      },
+      "reproduced": true
+    },
+    {
+      "case": "operador-mueve-a-sucursal-ajena",
+      "observed": {
+        "status": 200,
+        "destination": "qa-b"
+      },
+      "reproduced": true
+    },
+    {
+      "case": "turno-duplicado",
+      "observed": {
+        "status": 200,
+        "n": 2
+      },
+      "reproduced": true
+    },
+    {
+      "case": "put-turno-existente",
+      "observed": {
+        "status": 200
+      },
+      "reproduced": true
+    },
+    {
+      "case": "api-admin-exige-sesion",
+      "observed": {
+        "status": 401
+      },
+      "reproduced": true
+    }
+  ]
+}

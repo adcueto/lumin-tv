@@ -1,0 +1,2123 @@
+{
+  "version": "1.6",
+  "fecha": "2026-09-19",
+  "ultimo_sha_revisado": "050cc2d090b58f4d1a7b1673c830111a347b3768",
+  "informe_qa": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
+  "alcance": "Seguimiento documental; no activa desarrollo, producción ni comerciales diferidos.",
+  "prioridades": {
+    "P0": "Integridad/seguridad o condición de cierre del bloque aplicable",
+    "P1": "Necesario para modernización/operación",
+    "P2": "Expansión y negocio diferidos"
+  },
+  "requisitos": [
+    {
+      "id": "RF-01",
+      "area": "Operación existente",
+      "requisito": "Preservar Roku, playlists, turnos y URLs de medios instaladas.",
+      "aceptacion": "Contratos con fixtures de base/candidato; transición versionada cuando haya cambios; Roku físico identificado.",
+      "fase": "B1–B8",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-02",
+      "area": "Reproductor",
+      "requisito": "Recuperar reproducción tras pérdida de internet, fallo de servidor y archivos dañados.",
+      "aceptacion": "No queda cargando indefinidamente; respaldo visible cuando no hay medio local; reconexión sin reiniciar; matrices F1–F21 según entrega.",
+      "fase": "B1",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-03",
+      "area": "Caché",
+      "requisito": "Caché limitada con desalojo, temporales, descarga completa y reintentos acotados.",
+      "aceptacion": "Probar tamaño conocido/desconocido, suma sobre presupuesto, lista estable/cambiada, descarga activa y cuarentena; no prometer persistencia tras reinicio sin evidencia.",
+      "fase": "B1",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-04",
+      "area": "Sucursal/pantallas",
+      "requisito": "Varias sucursales y pantallas con promos/precios propios, orientación y asignación de listas.",
+      "aceptacion": "Operar dos sucursales sin mezclar contenido; ID de dispositivo preservado; número visible y desfase diferenciados.",
+      "fase": "B3/B5/B6",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-05",
+      "area": "Biblioteca",
+      "requisito": "Subir y administrar imágenes/videos preparados externamente, con vista previa, duración y validación.",
+      "aceptacion": "Archivo inválido rechazado con motivo; renombrar/eliminar mantiene integridad de listas; consumo real; tratamiento explícito de contenido en uso.",
+      "fase": "B5/B6",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-06",
+      "area": "Listas",
+      "requisito": "Crear, ordenar, renombrar y asignar múltiples listas; distinguir herencia de sucursal y asignación de pantalla.",
+      "aceptacion": "Orden y selección reproducibles; heredada/asignada claramente visibles; eliminar lista no borra medios.",
+      "fase": "B3/B5/B6",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-07",
+      "area": "Programación",
+      "requisito": "Programar contenido por fechas, días, horas, vencimiento, prioridad y destino.",
+      "aceptacion": "Regla de conflictos escrita; pruebas en medianoche, zonas horarias, solapamientos y respaldo; recepción confirmada por dispositivo.",
+      "fase": "B7",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-08",
+      "area": "Mensajes",
+      "requisito": "Conservar franja inferior/cintillo y gestionar mensajes por sucursal/destino.",
+      "aceptacion": "Configurar texto y velocidad; convivencia con anuncios/turnos. Banner/pantalla completa y prioridades del brief se refinan antes de ampliar.",
+      "fase": "B5/B6/B7",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-09",
+      "area": "Turnos actuales",
+      "requisito": "Mostrar llamado, estación y cola compatible con el POS sin interrumpir indebidamente publicidad.",
+      "aceptacion": "Regresión POST/PUT, folio, estación, expiración y fin del llamado; volver a anuncios; espera solo con cálculo/contrato definido.",
+      "fase": "B1/B5/B6",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-10",
+      "area": "Integración POS",
+      "requisito": "Mantener TV usable sin POS y una integración opcional por sucursal.",
+      "aceptacion": "Autenticación, pertenencia, idempotencia, reintentos y auditoría; no modificar LUMIA en este encargo.",
+      "fase": "B5/B8; comercial futuro",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-11",
+      "area": "Estado/estadísticas",
+      "requisito": "Distinguir conexión, sincronización, descarga y reproducción confirmada.",
+      "aceptacion": "HEAD/404 no cuentan descarga; eventos repetidos no duplican; conexión no implica reproducción; ninguna equivalencia con personas o ventas.",
+      "fase": "B2/B5/B8",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-12",
+      "area": "Identidad",
+      "requisito": "Inicio de sesión, verificación de correo mediante código e invitaciones.",
+      "aceptacion": "Código con propósito, expiración, único uso, límites concurrentes y recuperación; invitación/admin en B4, alta pública diferida; correo real solo en entorno autorizado.",
+      "fase": "B4; alta pública futura",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-13",
+      "area": "Permisos",
+      "requisito": "Admin de empresa y operador limitado a sucursales/acciones concedidas.",
+      "aceptacion": "Lista vacía no concede todo; ID fuera de alcance rechazado; traslado valida origen y destino; sin credencial fija de bootstrap.",
+      "fase": "B4",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-14",
+      "area": "Panel",
+      "requisito": "Panel con navegación lateral, secciones/rutas y selector global de sucursal.",
+      "aceptacion": "Once secciones actuales: Inicio, Pantallas, Biblioteca, Listas, Programación, Mensajes, Turnos, Sucursales, Integraciones, Usuarios y Configuración; no mostrar módulos futuros como funcionales.",
+      "fase": "B6",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-15",
+      "area": "Dispositivo",
+      "requisito": "Vinculación temporal y credencial propia renovable/revocable por pantalla.",
+      "aceptacion": "Código expirado/reutilizado rechazado; token sin acceso admin; URLs/medios y ámbito de empresa protegidos; transición de flota compatible.",
+      "fase": "B8",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-16",
+      "area": "Empresas",
+      "requisito": "Preparar empresa → sucursal → pantalla, aislando datos, medios y procesos.",
+      "aceptacion": "Dos empresas sintéticas con claves iguales; filtros, RLS y FKs probados; segunda empresa operativa bloqueada hasta cerrar contratos de medios/dispositivos.",
+      "fase": "B3/B8",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-17",
+      "area": "Portal del dueño",
+      "requisito": "Portal separado para empresas, planes, pagos, límites, incidencias y soporte.",
+      "aceptacion": "Sesión de empresa no sirve en plataforma; soporte y suspensión auditados; excepciones explícitas, sin trato especial oculto a LUMIN.",
+      "fase": "Comercial diferido",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-18",
+      "area": "Suscripciones",
+      "requisito": "Catálogo versionado, planes, complementos, cuotas, consumo y estados de servicio.",
+      "aceptacion": "Validación concurrente de cuotas; pago separado de acceso; no borrar contenido por reducción; regularización accesible; dependencias de módulos explicadas.",
+      "fase": "Comercial diferido",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-19",
+      "area": "Cobros",
+      "requisito": "Definir forma de cobro, precios, impuestos, vigencia, cancelación y reactivación.",
+      "aceptacion": "Modelo de costos aprobado; manual/recurrente decidido; monto y fecha antes de confirmar; webhooks idempotentes si se elige pasarela; sin cargos sin aceptación.",
+      "fase": "Comercial diferido",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-20",
+      "area": "Web comercial",
+      "requisito": "Web con funciones, giros, compatibilidad, planes, contacto/demo y acceso.",
+      "aceptacion": "Catálogo único con backend; formularios reales; próximos módulos rotulados; sin testimonios ficticios; textos legales revisados antes de publicación.",
+      "fase": "Comercial diferido",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-21",
+      "area": "Turnos ampliados",
+      "requisito": "Motor configurable por giro con folios, cola, estados, áreas y privacidad.",
+      "aceptacion": "Crear/llamar/repetir/atender/cancelar; reinicio/prefijos configurados; folio sin nombre permitido; voz opcional definida; espera no inventada.",
+      "fase": "Expansión diferida",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-22",
+      "area": "Reconocimientos",
+      "requisito": "Módulo de empleado del mes con selección manual e historial.",
+      "aceptacion": "Programación y destinos; sin datos privados; automatización POS solo con contrato y aprobación; una imagen normal no requiere el módulo.",
+      "fase": "Expansión diferida",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-23",
+      "area": "Menú digital",
+      "requisito": "Productos, categorías, precios, disponibilidad y horarios de menú.",
+      "aceptacion": "Publicación consistente por sucursal; integración automática solo con contrato; una imagen normal de menú sigue siendo contenido común.",
+      "fase": "Expansión diferida",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-24",
+      "area": "Android",
+      "requisito": "Evaluar/desarrollar Android TV/Google TV sobre contratos comunes.",
+      "aceptacion": "Equipo físico, codecs, orientación, control remoto, offline, distribución y actualización verificados; no implica Tizen/webOS.",
+      "fase": "Expansión diferida",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-01",
+      "area": "Persistencia",
+      "requisito": "Migrar JSON a PostgreSQL con IDs, relaciones y semántica conservados.",
+      "aceptacion": "Migración idempotente; diferencias permitidas enumeradas; comparación de contratos, copia sintética y luego anonimizada autorizada; decisiones D1/D2 aplicadas explícitamente.",
+      "fase": "B3",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-02",
+      "area": "Recuperación",
+      "requisito": "Espejo/exportación y rollback consistentes, sin reactivar sesiones revocadas.",
+      "aceptacion": "Ensayos de commits fuera de orden, caída entre pasos y disco lleno; snapshot coherente; revocaciones conservadas o logout total definido; recuperación cronometrada.",
+      "fase": "B3",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-03",
+      "area": "Arquitectura",
+      "requisito": "Modernización incremental: Python, PostgreSQL, API modular y panel React/TypeScript propuestos.",
+      "aceptacion": "ADRs y dependencias revisadas; B3 conserva servidor/medios, B5 define FastAPI/entrega de medios; S3 según evidencia; sin reescritura integral ni stack aprobado por existencia de documento.",
+      "fase": "B3–B6",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-04",
+      "area": "Concurrencia",
+      "requisito": "Evitar pérdidas de sesiones, altas, marcas de giro y solicitudes simultáneas.",
+      "aceptacion": "Suite original contra SHA exacto; 120 respuestas contabilizadas y sin excepciones; nueva persistencia conserva garantías con pruebas concurrentes.",
+      "fase": "B2/B3",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-05",
+      "area": "Seguridad",
+      "requisito": "Aislamiento efectivo, secretos protegidos y permisos mínimos.",
+      "aceptacion": "Pruebas negativas por tabla/API/archivo/job; roles RLS ejecutables; sin tokens en informes; auth por dispositivo cuando se habilite multiempresa real.",
+      "fase": "B3/B4/B8",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-06",
+      "area": "Procesamiento",
+      "requisito": "Procesar medios sin bloquear panel mediante trabajos recuperables cuando se implemente B5.",
+      "aceptacion": "Digest/versión/destino correctos; posesión y publicación consistentes; reintentos/cancelación incluidos en_curso; caída entre DB y archivo recuperable.",
+      "fase": "B5",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-07",
+      "area": "Observabilidad",
+      "requisito": "Bitácora con rotación, errores útiles y métricas veraces.",
+      "aceptacion": "Error sintético queda registrado sin secretos; conexiones/errores rastreables; alarmas y retención definidos antes de operar nueva infraestructura.",
+      "fase": "B2/B5/Release",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-08",
+      "area": "UX y accesibilidad",
+      "requisito": "Interfaz responsive, consistente, accesible y conectada a datos reales.",
+      "aceptacion": "Carga/vacío/error/sin permiso; teclado/foco/etiquetas/contraste; verificar 360/768/1440 px; mocks identificados solo en propuestas.",
+      "fase": "B6",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-09",
+      "area": "Release",
+      "requisito": "Respaldos restaurables, configuración reproducible y release autorizado.",
+      "aceptacion": "Restaurar DB y medios en limpio; HTTPS/roles/secretos/servicio; candidato y plan de reversión identificados; ensayo previo y autorización de producción.",
+      "fase": "B3/Release",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RNF-10",
+      "area": "QA y coordinación",
+      "requisito": "Trazabilidad requisitos → tareas → SHA → evidencia → dictamen.",
+      "aceptacion": "Fuente de estado única; evidencia estática/ejecutada/aportada distinguida; CI por SHA o alternativa acordada; no verde global por compilación.",
+      "fase": "Transversal",
+      "fuente": "Conversación del propietario y docs/coordinacion/08-encargo-original.txt"
+    },
+    {
+      "id": "RF-25",
+      "area": "Exploración IA",
+      "requisito": "Evaluar usos de IA que ayuden a operar o diagnosticar sin construir un editor de anuncios.",
+      "aceptacion": "Caso de uso, datos necesarios, costo, privacidad y comparación sin IA; decidir adoptar o descartar. No implica funcionalidad aprobada.",
+      "fase": "Exploración diferida",
+      "fuente": "Conversación del propietario: investigar ventajas de IA, editor/plantillas excluidos"
+    },
+    {
+      "id": "RF-26",
+      "area": "Playlists por destino y grupos",
+      "requisito": "Elegir desde cada playlist una TV, varias TVs o grupos nombrados donde mostrarla; administrar miembros y consultar la asignación efectiva.",
+      "aceptacion": "Selección individual/múltiple/grupal sin duplicados; conflictos y membresía explícitos; permisos por empresa/sucursal; offline y recepción por TV; conservar turnos/cintillo. Detalle y decisiones en docs/requisitos/RF-26-playlists-por-tv-y-grupo.md.",
+      "fase": "Impacto en diseño B3; implementación propuesta B5/B6",
+      "fuente": "Petición expresa de Adrián del 2026-09-19; docs/requisitos/RF-26-playlists-por-tv-y-grupo.md"
+    }
+  ],
+  "tareas": [
+    {
+      "id": "BL-001",
+      "titulo": "Documentación común y estructura del repositorio",
+      "requisitos": [
+        "RNF-10"
+      ],
+      "bloque": "Gestión",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "00",
+      "dependencias": [],
+      "aceptacion": "Entradas AGENTS/CLAUDE, roles e índice disponibles; enlaces comprobados.",
+      "evidencia": "docs/coordinacion/consolidacion-2026-09-16.json",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-002",
+      "titulo": "Corregir encolado del reintento activo",
+      "requisitos": [
+        "RF-02",
+        "RF-03"
+      ],
+      "bloque": "B1",
+      "estado": "verificado",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "Una URL falla y reintenta a 30 s sin nuevos mensajes; cinco esperas y seis intentos sin duplicados.",
+      "evidencia": "docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md",
+      "hallazgo": "R3-B1-01 cerrado en arnés brs; no hardware",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2"
+    },
+    {
+      "id": "BL-003",
+      "titulo": "Distinguir reconciliación de cambio que libera espacio",
+      "requisitos": [
+        "RF-03"
+      ],
+      "bloque": "B1",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "Reconciliaciones idénticas no reactivan sin_espacio; cambio efectivo sí.",
+      "evidencia": "docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md",
+      "hallazgo": "R3-B1-02 cerrado en arnés brs; no hardware",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2"
+    },
+    {
+      "id": "BL-004",
+      "titulo": "Regresión caché, cuarentena, comando y datos obsoletos",
+      "requisitos": [
+        "RF-01",
+        "RF-02",
+        "RF-03",
+        "RF-09"
+      ],
+      "bloque": "B1",
+      "estado": "parcial",
+      "prioridad": "P0",
+      "responsable": "01 + 00",
+      "dependencias": [
+        "BL-002",
+        "BL-003"
+      ],
+      "aceptacion": "Repetir todos los recorridos señalados en informes B1 y sus correcciones sobre un SHA; identificar compilación y límites.",
+      "evidencia": "docs/qa/informes/23-qa-B3-rev5-B5a-R2-3a1eaf9.md",
+      "hallazgo": "Arneses 42+21 pasan; recarga corregida en alcance aislado, F1–F24 físico pendiente en build 62.",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "3a1eaf92e7d1e51ee1e13d41356f4788760c6fbc"
+    },
+    {
+      "id": "BL-005",
+      "titulo": "Validación física Roku F1–F24",
+      "requisitos": [
+        "RF-01",
+        "RF-02",
+        "RF-03",
+        "RF-09",
+        "RF-15"
+      ],
+      "bloque": "B1",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "Adrián + 01; revisa 00",
+      "dependencias": [
+        "BL-004",
+        "BL-051"
+      ],
+      "aceptacion": "Modelo/OS/build, clips/resultados por escenario, pérdida de red/servidor, retorno, caché, turnos y comandos; tiempos acordados.",
+      "evidencia": "docs/qa/informes/24-qa-B3-rev6-RF26-a0583df.md",
+      "hallazgo": "Físico build62 pendiente. F23a/b/c precisan los casos; corregir esperado 5.2.61 en F22 y señal de log recargar inexistente antes de ejecutar.",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "a0583df14a5367f2ac8b33c3c3711fb84373ba65"
+    },
+    {
+      "id": "BL-006",
+      "titulo": "Higiene B2: bitácora, concurrencia, índices y contadores",
+      "requisitos": [
+        "RF-11",
+        "RNF-04",
+        "RNF-07"
+      ],
+      "bloque": "B2",
+      "estado": "verificado",
+      "prioridad": "P0",
+      "responsable": "01; QA 00",
+      "dependencias": [],
+      "aceptacion": "Diez pruebas originales pasan ahora con pytest dentro de las 21 de servidor en ce4716f; sin cambios del producto B2 desde revisión previa.",
+      "evidencia": "docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2"
+    },
+    {
+      "id": "BL-007",
+      "titulo": "HEAD de medios sin aumentar contadores",
+      "requisitos": [
+        "RF-03",
+        "RF-11"
+      ],
+      "bloque": "B2",
+      "estado": "verificado",
+      "prioridad": "P0",
+      "responsable": "01; QA 00",
+      "dependencias": [],
+      "aceptacion": "Tres funciones HEAD pasan con las diez previas; tamaños/cabeceras/404 y ausencia de incremento comprobados.",
+      "evidencia": "docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2"
+    },
+    {
+      "id": "BL-008",
+      "titulo": "Completar ejecución pytest/CI del candidato",
+      "requisitos": [
+        "RNF-10",
+        "RNF-04"
+      ],
+      "bloque": "QA",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01 + 00",
+      "dependencias": [
+        "BL-002",
+        "BL-003"
+      ],
+      "aceptacion": "PG55 ejecutado localmente, sin omitidos; CI35434726333 del SHA exacto: 28 servidor/55 PG/42+21 Roku/compilación. Producto y panel sin cambios, hashes verificados.",
+      "evidencia": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "050cc2d090b58f4d1a7b1673c830111a347b3768"
+    },
+    {
+      "id": "BL-009",
+      "titulo": "Corregir espejo que asume orden por max(id)",
+      "requisitos": [
+        "RNF-02",
+        "RNF-04"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "verificado",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "Protocolo cubre A reserva/B confirma/espejo/A confirma, sin tercer cambio; marcas pendientes y snapshot coherente.",
+      "evidencia": "docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md",
+      "hallazgo": "B3-R2-01 cerrado para protocolo del DDL mínimo con PG16; no implementación B3",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2"
+    },
+    {
+      "id": "BL-010",
+      "titulo": "Reversión sin reactivar sesiones revocadas",
+      "requisitos": [
+        "RF-12",
+        "RNF-02",
+        "RNF-05"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "verificado",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "Contrato de sesiones/rollback y barrera completa ensayados en PG55: revocadas no se reactivan, idle/peticiones tardías no escriben tras drenaje y otra base sobrevive. No implementa rollback productivo ni resuelve decisión D7.",
+      "evidencia": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "050cc2d090b58f4d1a7b1673c830111a347b3768"
+    },
+    {
+      "id": "BL-011",
+      "titulo": "Completar matriz RLS, marcas y rol del espejo",
+      "requisitos": [
+        "RF-16",
+        "RNF-05"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "parcial",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "DDL/roles/políticas permiten mutación+marca, auditoría, espejo y backup; controles negativos impiden cruce.",
+      "evidencia": "docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md",
+      "hallazgo": "B3-R2-03 cerrado en DDL mínimo; B3-R3-04 cobertura/guardián pendientes",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2"
+    },
+    {
+      "id": "BL-012",
+      "titulo": "Inventario fiable: faltantes, esquema e IDs inequívocos",
+      "requisitos": [
+        "RF-04",
+        "RF-13",
+        "RNF-10"
+      ],
+      "bloque": "Decisiones",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "Ocho pruebas del inventario pasan: casos originales de ruta/archivos/JSON/forma raíz, vacío y alias. No equivale a validación exhaustiva de todos los campos anidados.",
+      "evidencia": "docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md",
+      "hallazgo": "INV-01 cerrado en los ocho casos sintéticos de su suite; inventario real y decisiones pendientes",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2"
+    },
+    {
+      "id": "BL-013",
+      "titulo": "Precisar documentos del espejo y contexto inicial de sesión",
+      "requisitos": [
+        "RF-12",
+        "RNF-02",
+        "RNF-05"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-010",
+        "BL-011"
+      ],
+      "aceptacion": "Contexto inicial de membresía y documentos del espejo precisados en diseño rev4 y ensayos del DDL mínimo. No aprueba implementación completa ni reversión de BL-010.",
+      "evidencia": "docs/qa/informes/22-qa-B3-rev4-B5a-1f7782e.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "1f7782eb384d1bf0b05688870c524b8ccdb05fe4"
+    },
+    {
+      "id": "BL-014",
+      "titulo": "Precisar publicación de trabajos y deduplicación por destino",
+      "requisitos": [
+        "RF-05",
+        "RNF-06"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "Contrato mínimo PG/archivos rev5 distingue publicado/ya_publicado/perdido; conserva artefacto al reintentar misma posesión y descarta solo al perder. Ensayos ejecutados, no trabajadores de producto.",
+      "evidencia": "docs/qa/informes/23-qa-B3-rev5-B5a-R2-3a1eaf9.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "3a1eaf92e7d1e51ee1e13d41356f4788760c6fbc"
+    },
+    {
+      "id": "BL-015",
+      "titulo": "Precisar corte, turno de humo e IP detrás de proxy/NAT",
+      "requisitos": [
+        "RF-01",
+        "RF-09",
+        "RNF-09"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "B3-R4-01 y B3-R6-01 cerrados en ensayos: termina todas las sesiones de aplicación de la base objetivo, bloquea nuevas y preserva otros roles y otras bases. No es ejecución real de corte/smoke en VPS.",
+      "evidencia": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "050cc2d090b58f4d1a7b1673c830111a347b3768"
+    },
+    {
+      "id": "BL-016",
+      "titulo": "Revisar diseño B3 corregido y fijar aceptación",
+      "requisitos": [
+        "RF-16",
+        "RNF-01",
+        "RNF-02",
+        "RNF-05",
+        "RNF-10"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "parcial",
+      "prioridad": "P0",
+      "responsable": "00",
+      "dependencias": [
+        "BL-009",
+        "BL-010",
+        "BL-011",
+        "BL-013",
+        "BL-014",
+        "BL-015",
+        "BL-075",
+        "BL-076"
+      ],
+      "aceptacion": "Dictamen documental por versión/SHA; cero hallazgos críticos de diseño abiertos; implementación requiere encargo posterior.",
+      "evidencia": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
+      "hallazgo": "Rev7 revisada: cierres de drenaje/sucursal; RF26-QA-02/03 y DOC-R7-01 pendientes. Diseño global no aprobado.",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "050cc2d090b58f4d1a7b1673c830111a347b3768"
+    },
+    {
+      "id": "BL-017",
+      "titulo": "D1: decidir números de pantallas duplicados",
+      "requisitos": [
+        "RF-04",
+        "RNF-01"
+      ],
+      "bloque": "Decisiones",
+      "estado": "decision",
+      "prioridad": "P1",
+      "responsable": "Adrián",
+      "dependencias": [
+        "BL-012"
+      ],
+      "aceptacion": "Tabla por ID inequívoco con número actual/propuesto y efecto en desfase; decisión explícita antes de migrar.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-018",
+      "titulo": "D2: decidir permisos efectivos e inválidos por usuario",
+      "requisitos": [
+        "RF-13",
+        "RNF-01"
+      ],
+      "bloque": "Decisiones",
+      "estado": "decision",
+      "prioridad": "P0",
+      "responsable": "Adrián",
+      "dependencias": [
+        "BL-012"
+      ],
+      "aceptacion": "Lista por usuario, alcance actual y destino; decidir si cambio en B3 o B4 sin concesión implícita.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-019",
+      "titulo": "D3/D4: aprobar política RLS y ventana del espejo",
+      "requisitos": [
+        "RNF-02",
+        "RNF-05"
+      ],
+      "bloque": "Decisiones",
+      "estado": "decision",
+      "prioridad": "P1",
+      "responsable": "Adrián + 00",
+      "dependencias": [
+        "BL-016"
+      ],
+      "aceptacion": "Decisión documentada; siete días no sustituye protocolo recuperable ni pruebas.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-020",
+      "titulo": "D6: anonimización y autorización de copia",
+      "requisitos": [
+        "RNF-01",
+        "RNF-05"
+      ],
+      "bloque": "Decisiones",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01; autoriza Adrián",
+      "dependencias": [
+        "BL-016"
+      ],
+      "aceptacion": "Script revisado con credenciales, tokens, mensajes, turnos, zonas/nombres; compartir solo copia revisada autorizada.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-021",
+      "titulo": "Autorizar implementación acotada B3",
+      "requisitos": [
+        "RNF-01",
+        "RNF-02",
+        "RNF-10"
+      ],
+      "bloque": "B3 implementación",
+      "estado": "decision",
+      "prioridad": "P0",
+      "responsable": "Adrián",
+      "dependencias": [
+        "BL-016",
+        "BL-019",
+        "BL-074"
+      ],
+      "aceptacion": "Alcance y criterios aprobados; separar autorización de implementar de fecha/corte real.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-022",
+      "titulo": "Paquete de datos, modelos, Alembic y roles PostgreSQL",
+      "requisitos": [
+        "RF-16",
+        "RNF-01",
+        "RNF-03",
+        "RNF-05"
+      ],
+      "bloque": "B3 implementación",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [
+        "BL-021",
+        "BL-072"
+      ],
+      "aceptacion": "Esquema revisado implementado; FKs y RLS por tabla; segunda empresa operativa bloqueada en etapa heredada.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-023",
+      "titulo": "Migrador JSON y contratos del servidor sobre PostgreSQL",
+      "requisitos": [
+        "RF-01",
+        "RF-04",
+        "RF-06",
+        "RNF-01"
+      ],
+      "bloque": "B3 implementación",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [
+        "BL-022"
+      ],
+      "aceptacion": "Idempotencia, mapeos y anomalías informadas; pruebas con decisiones sintéticas; IDs y formas de respuesta conservados.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-024",
+      "titulo": "Implementar espejo, exportación y rollback",
+      "requisitos": [
+        "RNF-02",
+        "RNF-04"
+      ],
+      "bloque": "B3 implementación",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [
+        "BL-022"
+      ],
+      "aceptacion": "Pruebas de caída, secuencias fuera de orden, snapshots, disco lleno, revocación y recuperación conforme al diseño aprobado.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-025",
+      "titulo": "Aislamiento y concurrencia con PostgreSQL real",
+      "requisitos": [
+        "RF-16",
+        "RNF-04",
+        "RNF-05"
+      ],
+      "bloque": "B3 implementación",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01 + 00",
+      "dependencias": [
+        "BL-023",
+        "BL-024"
+      ],
+      "aceptacion": "Dos empresas sintéticas, claves iguales, SQL crudo, conexiones reutilizadas, escrituras concurrentes; registros por rol y SHA.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-026",
+      "titulo": "Ensayo migración/rollback y restauración de respaldo",
+      "requisitos": [
+        "RNF-01",
+        "RNF-02",
+        "RNF-09"
+      ],
+      "bloque": "B3 implementación",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01 + 00; 03 por asignar",
+      "dependencias": [
+        "BL-023",
+        "BL-024",
+        "BL-020"
+      ],
+      "aceptacion": "Sintético y luego anonimizado autorizado; restauración DB/medios, tiempos medidos y fallos de cada paso.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-027",
+      "titulo": "QA de B3 y compatibilidad Roku/POS",
+      "requisitos": [
+        "RF-01",
+        "RF-09",
+        "RF-10",
+        "RNF-10"
+      ],
+      "bloque": "B3 implementación",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "00 + Adrián",
+      "dependencias": [
+        "BL-025",
+        "BL-026"
+      ],
+      "aceptacion": "Revisión independiente por SHA y matriz de contratos; Roku 5.1/5.2 físicos según alcance; no confundir lectura con reproducción.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-028",
+      "titulo": "Correo verificado, acceso e invitaciones",
+      "requisitos": [
+        "RF-12"
+      ],
+      "bloque": "B4",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-027"
+      ],
+      "aceptacion": "Códigos de un uso/expiración/propósito, límites/reenvíos; SMTP autorizado aparte; altas admin/invitación, sin alta pública.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-029",
+      "titulo": "Permisos cerrados y traslado de sucursal",
+      "requisitos": [
+        "RF-13",
+        "RNF-05"
+      ],
+      "bloque": "B4",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [
+        "BL-027",
+        "BL-018"
+      ],
+      "aceptacion": "Vacío deniega, ID inválido no cambia sucursal silenciosamente, origen/destino validado; pruebas positivas y negativas.",
+      "evidencia": "docs/coordinacion/09-auditoria-codigo.md",
+      "hallazgo": "QA-F01 / QA-F02",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-030",
+      "titulo": "Eliminar bootstrap fijo y migrar hashes/sesiones",
+      "requisitos": [
+        "RF-12",
+        "RF-13",
+        "RNF-05"
+      ],
+      "bloque": "B4",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [
+        "BL-028"
+      ],
+      "aceptacion": "Sin contraseña fija; transición Argon2id, revocación y recuperación B4 ensayadas; secretos externos.",
+      "evidencia": "docs/coordinacion/09-auditoria-codigo.md",
+      "hallazgo": "QA-F03",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-031",
+      "titulo": "API modular v2 y convivencia de contratos",
+      "requisitos": [
+        "RF-01",
+        "RNF-03"
+      ],
+      "bloque": "B5",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-027"
+      ],
+      "aceptacion": "Inventario de rutas actualizado, errores/auth consistentes y endpoints antiguos preservados durante transición.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-032",
+      "titulo": "Estado real, sincronización y asignación heredada",
+      "requisitos": [
+        "RF-04",
+        "RF-06",
+        "RF-11"
+      ],
+      "bloque": "B5",
+      "estado": "parcial",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-031"
+      ],
+      "aceptacion": "Conectado/asignado/recibido/reproduciendo separados; números y desfase distintos; lista heredada visible.",
+      "evidencia": "docs/qa/informes/22-qa-B3-rev4-B5a-1f7782e.md",
+      "hallazgo": "Telemetría B5a entregada; no acredita todavía ACK por versión ni reproducción efectiva/física",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": "1f7782eb384d1bf0b05688870c524b8ccdb05fe4"
+    },
+    {
+      "id": "BL-033",
+      "titulo": "Idempotencia y contrato de turnos con POS",
+      "requisitos": [
+        "RF-09",
+        "RF-10"
+      ],
+      "bloque": "B5",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [
+        "BL-031"
+      ],
+      "aceptacion": "Reintentos, eventos duplicados/tardíos y cruces de sucursal sin doble llamado; LUMIA solo lectura.",
+      "evidencia": "docs/coordinacion/09-auditoria-codigo.md",
+      "hallazgo": "QA-G02",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-034",
+      "titulo": "Telemetría y métricas de reproducción reales",
+      "requisitos": [
+        "RF-11",
+        "RNF-07"
+      ],
+      "bloque": "B5/B8",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-032",
+        "BL-047"
+      ],
+      "aceptacion": "Eventos confirmados por dispositivo deduplicados; descarga no se etiqueta reproducción/persona/venta.",
+      "evidencia": "docs/coordinacion/09-auditoria-codigo.md",
+      "hallazgo": "QA-F04: pendiente más allá de 404/HEAD",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-035",
+      "titulo": "Cola de conversión y publicación de archivos",
+      "requisitos": [
+        "RF-05",
+        "RNF-06"
+      ],
+      "bloque": "B5",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-031",
+        "BL-014"
+      ],
+      "aceptacion": "Trabajador recuperable con digest, destino y posesión; cancelación en curso y publicación atómica según protocolo.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-036",
+      "titulo": "Entrega de medios autorizada y capacidad",
+      "requisitos": [
+        "RF-05",
+        "RF-15",
+        "RF-16",
+        "RNF-03",
+        "RNF-05"
+      ],
+      "bloque": "B5/B8",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01; 03 por asignar",
+      "dependencias": [
+        "BL-031",
+        "BL-047"
+      ],
+      "aceptacion": "Acceso por empresa/sucursal verificado; nginx interno o S3 firmado justificado; no abrir alias público que salte auth; costos medidos.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-037",
+      "titulo": "Propuesta de navegación y componentes",
+      "requisitos": [
+        "RF-14",
+        "RNF-08"
+      ],
+      "bloque": "B6",
+      "estado": "parcial",
+      "prioridad": "P1",
+      "responsable": "01 propuesta entregada; revisa 00; decide Adrián",
+      "dependencias": [
+        "BL-031"
+      ],
+      "aceptacion": "Mapa de once secciones, selector de sucursal, estados y datos/contratos; alcance asignado antes de implementar.",
+      "evidencia": "docs/qa/informes/24-qa-B3-rev6-RF26-a0583df.md",
+      "hallazgo": "Panel rev3 mejora confirmación/reemplazo y etiqueta estados futuros; UI33 pasa. Cuatro supuestos y decisiones de grupos pendientes.",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": "a0583df14a5367f2ac8b33c3c3711fb84373ba65"
+    },
+    {
+      "id": "BL-038",
+      "titulo": "Panel: Inicio, Sucursales y Pantallas",
+      "requisitos": [
+        "RF-04",
+        "RF-11",
+        "RF-14",
+        "RNF-08"
+      ],
+      "bloque": "B6",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "02 + 01",
+      "dependencias": [
+        "BL-037",
+        "BL-032"
+      ],
+      "aceptacion": "Datos reales y controles soportados; estados correctos; acciones respetan permisos del servidor.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-039",
+      "titulo": "Panel: Biblioteca y Listas",
+      "requisitos": [
+        "RF-05",
+        "RF-06",
+        "RF-14",
+        "RNF-08"
+      ],
+      "bloque": "B6",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "02 + 01",
+      "dependencias": [
+        "BL-037"
+      ],
+      "aceptacion": "Subir, ordenar, asignar, renombrar, borrar y errores sin mocks; herencia explícita; sin editor gráfico.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-040",
+      "titulo": "Panel: Mensajes, Turnos e Integraciones",
+      "requisitos": [
+        "RF-08",
+        "RF-09",
+        "RF-10",
+        "RF-14"
+      ],
+      "bloque": "B6",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "02 + 01",
+      "dependencias": [
+        "BL-037",
+        "BL-033"
+      ],
+      "aceptacion": "Cintillo configurable, estado de integración y errores; configuración por pantalla/sucursal y privacidad.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-041",
+      "titulo": "Panel: Usuarios, Configuración y Programación",
+      "requisitos": [
+        "RF-07",
+        "RF-12",
+        "RF-13",
+        "RF-14"
+      ],
+      "bloque": "B6",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "02 + 01",
+      "dependencias": [
+        "BL-037",
+        "BL-029",
+        "BL-043"
+      ],
+      "aceptacion": "Permisos reales, perfiles, zona horaria y reglas de horarios; no exponer módulos comerciales sin implementar.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-042",
+      "titulo": "QA responsive, accesibilidad y flujo completo",
+      "requisitos": [
+        "RF-14",
+        "RNF-08",
+        "RNF-10"
+      ],
+      "bloque": "B6",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "00 + 02",
+      "dependencias": [
+        "BL-038",
+        "BL-039",
+        "BL-040",
+        "BL-041"
+      ],
+      "aceptacion": "Teclado/foco, contraste, viewport, estados error/sin permiso y cambio de sucursal sin datos previos indebidos.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-043",
+      "titulo": "Horarios, vencimientos y conflictos deterministas",
+      "requisitos": [
+        "RF-07"
+      ],
+      "bloque": "B7",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-031"
+      ],
+      "aceptacion": "Zona horaria, medianoche, solapamientos, prioridad y contenido de respaldo con pruebas reproducibles.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-044",
+      "titulo": "Publicación por destinos y confirmación recibida",
+      "requisitos": [
+        "RF-07",
+        "RF-08",
+        "RF-11"
+      ],
+      "bloque": "B7",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01 + 02",
+      "dependencias": [
+        "BL-043",
+        "BL-032"
+      ],
+      "aceptacion": "Cambios multi-sucursal/pantalla, estado guardado/enviado/recibido; excepciones y retirada de mensaje según capacidad.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-045",
+      "titulo": "Protocolo de vinculación y tokens por pantalla",
+      "requisitos": [
+        "RF-15",
+        "RF-16",
+        "RNF-05"
+      ],
+      "bloque": "B8",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "01",
+      "dependencias": [
+        "BL-028",
+        "BL-031"
+      ],
+      "aceptacion": "Código temporal único, permisos mínimos, renovación/revocación y modelo de URLs con identidad.",
+      "evidencia": "docs/coordinacion/09-auditoria-codigo.md",
+      "hallazgo": "QA-G01",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-046",
+      "titulo": "Adaptar Roku a protocolo v2 y telemetría",
+      "requisitos": [
+        "RF-01",
+        "RF-11",
+        "RF-15"
+      ],
+      "bloque": "B8",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-045",
+        "BL-005"
+      ],
+      "aceptacion": "Credenciales protegidas, llamadas de reproducción y convivencia; renovar/revocar y reconectar en TV real.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-047",
+      "titulo": "QA dispositivo/medios y transición de flota",
+      "requisitos": [
+        "RF-01",
+        "RF-15",
+        "RF-16",
+        "RNF-05"
+      ],
+      "bloque": "B8",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "00 + 01 + Adrián",
+      "dependencias": [
+        "BL-046"
+      ],
+      "aceptacion": "Cruce de IDs/URLs negado; regresión de clientes antiguos; migración por pantalla ensayada, activación real aparte.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-048",
+      "titulo": "Preparar release, respaldo y entorno operativo",
+      "requisitos": [
+        "RNF-07",
+        "RNF-09"
+      ],
+      "bloque": "Release",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "03 por asignar; revisa 00",
+      "dependencias": [
+        "BL-027"
+      ],
+      "aceptacion": "Servicios/HTTPS/secretos, restauración, capacidad, alertas y rollback documentados; alcance puede ser por bloque aprobado.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-049",
+      "titulo": "D5: ventana y autorización de despliegue",
+      "requisitos": [
+        "RF-01",
+        "RNF-09"
+      ],
+      "bloque": "Release",
+      "estado": "decision",
+      "prioridad": "P0",
+      "responsable": "Adrián",
+      "dependencias": [
+        "BL-048",
+        "BL-005",
+        "BL-017",
+        "BL-018",
+        "BL-019"
+      ],
+      "aceptacion": "Versión, destino, operador, ventana y rollback aprobados; pendientes que apliquen al bloque resueltos.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-050",
+      "titulo": "Ejecutar piloto y cierre del bloque desplegado",
+      "requisitos": [
+        "RF-01",
+        "RNF-07",
+        "RNF-09",
+        "RNF-10"
+      ],
+      "bloque": "Release",
+      "estado": "pendiente",
+      "prioridad": "P0",
+      "responsable": "03 por asignar + 00 + Adrián",
+      "dependencias": [
+        "BL-049"
+      ],
+      "aceptacion": "Humo real autorizado, seguimiento del bloque, evidencia operativa y reversión lista; no implica SaaS lanzado.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-051",
+      "titulo": "Acordar límites de espera, formatos y equipo piloto",
+      "requisitos": [
+        "RF-02",
+        "RF-03",
+        "RF-09",
+        "RF-15"
+      ],
+      "bloque": "Decisiones",
+      "estado": "decision",
+      "prioridad": "P1",
+      "responsable": "Adrián + 01",
+      "dependencias": [],
+      "aceptacion": "Registrar modelo/OS, formatos, orientación, umbral de turno vencido y aceptación de caché no garantizada tras reinicio.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-052",
+      "titulo": "Autorizar entorno de correo y política de acceso",
+      "requisitos": [
+        "RF-12"
+      ],
+      "bloque": "Decisiones",
+      "estado": "decision",
+      "prioridad": "P1",
+      "responsable": "Adrián",
+      "dependencias": [],
+      "aceptacion": "Proveedor/remitente/entorno y destinatarios de prueba definidos; no envíos reales por una propuesta documental.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-053",
+      "titulo": "Definir límites de carga y objetivos de rendimiento",
+      "requisitos": [
+        "RF-05",
+        "RNF-03",
+        "RNF-04",
+        "RNF-07"
+      ],
+      "bloque": "Decisiones",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01 + 00 + Adrián",
+      "dependencias": [],
+      "aceptacion": "Carga representativa, tamaños/formatos, almacenamiento, concurrencia y umbrales medibles acordados antes de declarar escalabilidad.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-054",
+      "titulo": "Modelo de costos, precio MXN e impuestos",
+      "requisitos": [
+        "RF-19"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "Adrián + 00",
+      "dependencias": [
+        "BL-053"
+      ],
+      "aceptacion": "Validar almacenamiento/transferencia/soporte; definir impuestos. Precios del brief siguen siendo propuestas.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-055",
+      "titulo": "Catálogo único de planes y complementos",
+      "requisitos": [
+        "RF-18",
+        "RF-19"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01",
+      "dependencias": [
+        "BL-054"
+      ],
+      "aceptacion": "Versiones, vigencia y dependencias; misma fuente para web/panel; no precios duplicados.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-056",
+      "titulo": "Portal del propietario y soporte auditado",
+      "requisitos": [
+        "RF-17",
+        "RF-16"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01 + 02",
+      "dependencias": [
+        "BL-047"
+      ],
+      "aceptacion": "Sesión/ámbito separado, empresas, consumo, incidencias, soporte y bloqueos auditados.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-057",
+      "titulo": "Alta pública de empresa y onboarding",
+      "requisitos": [
+        "RF-12",
+        "RF-16",
+        "RF-18"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01 + 02",
+      "dependencias": [
+        "BL-047",
+        "BL-055"
+      ],
+      "aceptacion": "Correo verificado, creación aislada, primer acceso/pantalla, prueba y aceptación de términos.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-058",
+      "titulo": "Cuotas y consumo concurrente",
+      "requisitos": [
+        "RF-18"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01",
+      "dependencias": [
+        "BL-055"
+      ],
+      "aceptacion": "Pantallas/sucursales/usuarios/listas/archivos/GB/campañas e historial por contrato; carreras no exceden cuota.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-059",
+      "titulo": "Estados de suscripción y política offline",
+      "requisitos": [
+        "RF-18",
+        "RF-15"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "Adrián + 01",
+      "dependencias": [
+        "BL-055"
+      ],
+      "aceptacion": "Prueba/activa/pago pendiente/vencida/suspendida/cancelada; regularización y acceso separados; pantalla pública neutral.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-060",
+      "titulo": "Cobro manual o recurrente y conciliación",
+      "requisitos": [
+        "RF-19"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "Adrián + 01",
+      "dependencias": [
+        "BL-054",
+        "BL-059"
+      ],
+      "aceptacion": "Decidir manual inicial o pasarela; recibos/eventos idempotentes, reintentos, ajustes y aceptación de cargos.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-061",
+      "titulo": "Cambios de plan, cancelación y reactivación",
+      "requisitos": [
+        "RF-18",
+        "RF-19"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01 + 02",
+      "dependencias": [
+        "BL-058",
+        "BL-060"
+      ],
+      "aceptacion": "Monto/fecha transparentes; reducción sin eliminar medios; reglas de tolerancia aprobadas.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-062",
+      "titulo": "Web comercial, demo/contacto y calculadora",
+      "requisitos": [
+        "RF-20"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "02 + 01",
+      "dependencias": [
+        "BL-055"
+      ],
+      "aceptacion": "Formularios reales, catálogo backend, compatibilidad exacta, funciones no disponibles rotuladas.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-063",
+      "titulo": "Términos, privacidad y autorización comercial",
+      "requisitos": [
+        "RF-20",
+        "RF-19"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "Adrián; 00 coordina",
+      "dependencias": [
+        "BL-062",
+        "BL-060"
+      ],
+      "aceptacion": "Revisión por responsable competente, información real y autorización de publicación/cobros.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-064",
+      "titulo": "Turnos configurables por giro",
+      "requisitos": [
+        "RF-21",
+        "RF-09"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01 + 02",
+      "dependencias": [
+        "BL-033"
+      ],
+      "aceptacion": "Estados/cola/áreas/folios/privacidad; N de espera con base definida, voz opcional y llamado sin bloquear anuncios.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-065",
+      "titulo": "Conector LUMIA comercial y dependencias",
+      "requisitos": [
+        "RF-10",
+        "RF-18"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01 + 02",
+      "dependencias": [
+        "BL-033",
+        "BL-055"
+      ],
+      "aceptacion": "Contrato por sucursal, límites/errores, Turnos + Conector transparentes; POS independiente, tarea aparte si requiere cambio.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-066",
+      "titulo": "Empleado del mes",
+      "requisitos": [
+        "RF-22"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01 + 02",
+      "dependencias": [
+        "BL-055"
+      ],
+      "aceptacion": "Selección manual, historial/destinos, sin datos privados; integración automática posterior con contrato.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-067",
+      "titulo": "Menú digital dinámico",
+      "requisitos": [
+        "RF-23"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01 + 02",
+      "dependencias": [
+        "BL-055"
+      ],
+      "aceptacion": "Catálogo/precios/disponibilidad/horarios por sucursal; imagen común no requiere complemento.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-068",
+      "titulo": "Android TV/Google TV y matriz física",
+      "requisitos": [
+        "RF-24",
+        "RF-15"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "01 + 00 + Adrián",
+      "dependencias": [
+        "BL-045"
+      ],
+      "aceptacion": "Player, control remoto, codecs/offline, distribución y actualización; pruebas físicas, sin compatibilidad universal.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-069",
+      "titulo": "Identidad comercial y propuesta de valor",
+      "requisitos": [
+        "RF-20",
+        "RF-19"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "Adrián + 00",
+      "dependencias": [
+        "BL-054"
+      ],
+      "aceptacion": "Nombre/dominio/marca verificados antes de elegir; evidencia de demanda/costos; no prometer ventas atribuibles sin medición.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-070",
+      "titulo": "QA integral y lanzamiento SaaS",
+      "requisitos": [
+        "RF-16",
+        "RF-17",
+        "RF-18",
+        "RF-19",
+        "RF-20",
+        "RNF-09",
+        "RNF-10"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "00 + Adrián",
+      "dependencias": [
+        "BL-056",
+        "BL-057",
+        "BL-058",
+        "BL-059",
+        "BL-060",
+        "BL-061",
+        "BL-063"
+      ],
+      "aceptacion": "Aislamiento end-to-end, cobros/pruebas y recuperación validados; sólo anunciar módulos efectivamente aprobados.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-071",
+      "titulo": "Evaluación acotada de IA para operación/diagnóstico",
+      "requisitos": [
+        "RF-25"
+      ],
+      "bloque": "Comercial / expansión",
+      "estado": "diferido",
+      "prioridad": "P2",
+      "responsable": "00 + 01",
+      "dependencias": [
+        "BL-034"
+      ],
+      "aceptacion": "Propuesta con datos/costos/beneficio y aceptación del propietario; ninguna generación automática ni promesa sin implementación.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "diferido",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-072",
+      "titulo": "Revisar piezas reutilizables del SaaS pausado",
+      "requisitos": [
+        "RNF-03",
+        "RNF-05",
+        "RNF-10"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01 + 00",
+      "dependencias": [],
+      "aceptacion": "Inventario por SHA b9c1f83 y archivos realmente reutilizados; revisar/adaptar pruebas; 36 verdes aportadas no equivalen a QA de esta integración.",
+      "evidencia": "docs/qa/informes/14-qa-R2-y-diseno-B3-5c96845.md",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-073",
+      "titulo": "Integrar documentación local a Git en rama acordada",
+      "requisitos": [
+        "RNF-10"
+      ],
+      "bloque": "Gestión",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01; coordina 00",
+      "dependencias": [
+        "BL-001"
+      ],
+      "aceptacion": "Revisar archivos preparados, rama/base y diff documental; preservar borrados ajenos; commit/push conforme autorización aplicable; registrar SHA, sin mezclar producto.",
+      "evidencia": "",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-074",
+      "titulo": "D7: decidir sesiones al revertir",
+      "requisitos": [
+        "RF-12",
+        "RNF-02",
+        "RNF-05"
+      ],
+      "bloque": "Decisiones",
+      "estado": "decision",
+      "prioridad": "P0",
+      "responsable": "Adrián",
+      "dependencias": [
+        "BL-010"
+      ],
+      "aceptacion": "Elegir conservación de sesiones verificadas o cierre total; emergencia sin PG no puede asegurar vigencia de la última copia.",
+      "evidencia": "docs/qa/informes/19-qa-B1-R4-B3-rev3-ce4716f.md",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2"
+    },
+    {
+      "id": "BL-075",
+      "titulo": "Corregir afirmaciones de cobertura y guardián RLS",
+      "requisitos": [
+        "RNF-05",
+        "RNF-10"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [],
+      "aceptacion": "Cobertura delimitada al DDL mínimo y guardián con control negativo de propietario ejecutados dentro de 39 ensayos PG. No acredita repositorios/esquema completo aún no implementados.",
+      "evidencia": "docs/qa/informes/22-qa-B3-rev4-B5a-1f7782e.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "1f7782eb384d1bf0b05688870c524b8ccdb05fe4"
+    },
+    {
+      "id": "BL-076",
+      "titulo": "Diseñar destinos y grupos de TVs; impacto en B3",
+      "requisitos": [
+        "RF-26",
+        "RF-06",
+        "RF-04"
+      ],
+      "bloque": "B3 diseño",
+      "estado": "correcciones",
+      "prioridad": "P1",
+      "responsable": "01; revisa 00",
+      "dependencias": [],
+      "aceptacion": "Preservar FK por sucursal; definir identidad de asignación y ACK vigente; historial/confirmaciones aislados por empresa con RLS ensayado; movimiento transaccional de relaciones y desempate estable de grupos.",
+      "evidencia": "docs/qa/informes/25-qa-B3-rev7-RF26-050cc2d.md",
+      "hallazgo": "RF26-QA-01 cerrado. RF26-QA-02: falta generación de asignación y control de ACK retrasado; RF26-QA-03: historial sin empresa_id y confirmación cruzada. DOC-R7-01: movimiento requiere limpieza explícita, no cascada automática.",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "050cc2d090b58f4d1a7b1673c830111a347b3768"
+    },
+    {
+      "id": "BL-077",
+      "titulo": "Datos/API para asignar playlists a TVs y grupos",
+      "requisitos": [
+        "RF-26",
+        "RF-06",
+        "RF-04"
+      ],
+      "bloque": "B5",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "01",
+      "dependencias": [
+        "BL-076",
+        "BL-021"
+      ],
+      "aceptacion": "Encargo definido, validación de permisos servidor, publicación coherente e idempotente, resolución por TV y recuperación de última asignación offline.",
+      "evidencia": "docs/requisitos/RF-26-playlists-por-tv-y-grupo.md",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-078",
+      "titulo": "Panel Reproducir en y administración de grupos",
+      "requisitos": [
+        "RF-26",
+        "RF-06",
+        "RF-04"
+      ],
+      "bloque": "B6",
+      "estado": "parcial",
+      "prioridad": "P1",
+      "responsable": "01; 02 si se asigna",
+      "dependencias": [
+        "BL-076",
+        "BL-077",
+        "BL-037"
+      ],
+      "aceptacion": "Selector TV/grupo, destinos únicos, resumen de cambios, estado por TV y gestión de miembros con reglas aprobadas; no falsos estados de reproducción.",
+      "evidencia": "docs/qa/informes/24-qa-B3-rev6-RF26-a0583df.md",
+      "hallazgo": "Rev3 muestra resumen único y reemplazo explícito; faltan datos/API reales y cierre del contrato RF-26.",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": "a0583df14a5367f2ac8b33c3c3711fb84373ba65"
+    },
+    {
+      "id": "BL-079",
+      "titulo": "QA de distribución de playlists por TV y grupo",
+      "requisitos": [
+        "RF-26",
+        "RF-06",
+        "RF-04"
+      ],
+      "bloque": "QA",
+      "estado": "pendiente",
+      "prioridad": "P1",
+      "responsable": "00; físico Adrián + 01",
+      "dependencias": [
+        "BL-077",
+        "BL-078"
+      ],
+      "aceptacion": "Ejecutar criterios RF-26: conflictos, permisos cruzados, offline, concurrencia, edición de grupo/lista y Roku físico con turnos/cintillo preservados.",
+      "evidencia": "docs/requisitos/RF-26-playlists-por-tv-y-grupo.md",
+      "hallazgo": "",
+      "alcance": "planificado",
+      "fecha_objetivo": null,
+      "sha_evidencia": null
+    },
+    {
+      "id": "BL-080",
+      "titulo": "Permisos de comandos administrativos B5a",
+      "requisitos": [
+        "RF-12",
+        "RF-11"
+      ],
+      "bloque": "B5",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01; revisa 00",
+      "dependencias": [],
+      "aceptacion": "POST/PUT recargar/vaciar_cache deniegan operador con 403 sin encolar ni avanzar n; permiten admin. Suite verifica sucursal ajena.",
+      "evidencia": "docs/qa/informes/23-qa-B3-rev5-B5a-R2-3a1eaf9.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "3a1eaf92e7d1e51ee1e13d41356f4788760c6fbc"
+    },
+    {
+      "id": "BL-081",
+      "titulo": "Recarga Roku con playlist idéntica",
+      "requisitos": [
+        "RF-01",
+        "RF-02",
+        "RF-11"
+      ],
+      "bloque": "B5",
+      "estado": "parcial",
+      "prioridad": "P1",
+      "responsable": "01; revisa 00",
+      "dependencias": [],
+      "aceptacion": "Recargar reinicia sin depender de JSON distinto; 21 comprobaciones aisladas pasan. Completar F23 físico con protocolo de corte realizable y build 62.",
+      "evidencia": "docs/qa/informes/23-qa-B3-rev5-B5a-R2-3a1eaf9.md",
+      "hallazgo": "B5A-QA-02 cerrado en código/arnés: 21/21; F23 físico pendiente.",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "3a1eaf92e7d1e51ee1e13d41356f4788760c6fbc"
+    },
+    {
+      "id": "BL-082",
+      "titulo": "Corregir desbordamiento de propuesta móvil",
+      "requisitos": [
+        "RF-14",
+        "RNF-08"
+      ],
+      "bloque": "B6",
+      "estado": "verificado",
+      "prioridad": "P1",
+      "responsable": "01; revisa 00",
+      "dependencias": [],
+      "aceptacion": "Rev3: 33 combinaciones de ancho sin desbordamiento y captura propia inspeccionada. Cierre acotado del ancho, no frontend/API ni accesibilidad completa.",
+      "evidencia": "docs/qa/informes/24-qa-B3-rev6-RF26-a0583df.md",
+      "hallazgo": "",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "a0583df14a5367f2ac8b33c3c3711fb84373ba65"
+    },
+    {
+      "id": "BL-083",
+      "titulo": "D8: concretar semántica persistente y alcance por sucursal de grupos",
+      "requisitos": [
+        "RF-26",
+        "RF-04"
+      ],
+      "bloque": "Decisiones",
+      "estado": "decision",
+      "prioridad": "P1",
+      "responsable": "Adrián; propuesta 01, registra 00",
+      "dependencias": [],
+      "aceptacion": "Resolver semántica de grupos ya solicitados, membresía y alcance por sucursal sobre propuesta 22; no interpretar selección puntual como cancelación del requisito de grupos.",
+      "evidencia": "docs/qa/informes/24-qa-B3-rev6-RF26-a0583df.md",
+      "hallazgo": "Propuesta de Claude, no decisión aprobada",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "a0583df14a5367f2ac8b33c3c3711fb84373ba65"
+    },
+    {
+      "id": "BL-084",
+      "titulo": "D9: permiso para reemplazar destino directo de otra lista",
+      "requisitos": [
+        "RF-26",
+        "RF-04"
+      ],
+      "bloque": "Decisiones",
+      "estado": "decision",
+      "prioridad": "P1",
+      "responsable": "Adrián; propuesta 01, registra 00",
+      "dependencias": [],
+      "aceptacion": "Decidir operador con alcance de sucursal o solo administrador; implementar validación servidor y auditoría según decisión documentada.",
+      "evidencia": "docs/qa/informes/24-qa-B3-rev6-RF26-a0583df.md",
+      "hallazgo": "Propuesta de Claude, no decisión aprobada",
+      "alcance": "actual",
+      "fecha_objetivo": null,
+      "sha_evidencia": "a0583df14a5367f2ac8b33c3c3711fb84373ba65"
+    }
+  ],
+  "estado_global": "🔴 Drenaje por base y relaciones RF-26 por sucursal cerrados en alcance ensayado. Pendientes RF26-QA-02 (generación de entrega), RF26-QA-03 (historial/empresa) y precisión DOC-R7-01. PG55 y CI verificados; físico y decisiones pendientes."
+}

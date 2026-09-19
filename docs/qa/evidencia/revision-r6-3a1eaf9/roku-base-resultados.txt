@@ -1,0 +1,9 @@
+interprete: C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r4-ce4716f\deps\node\node_modules\.bin\brs.cmd
+--- escena.brs contra C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r5-1f7782e\roku-app\components\MainScene.brs
+
+== B5A-QA-02 recargar con respuesta identica: la reproduccion arranca sin esperar
+BRIGHTSCRIPT: ERROR: Runtime: unknown classname "roRegistrySection": pkg:/C:/Users/adcueto/OneDrive/Documents/ChatGPT/LUMIN-TV/revision-r5-1f7782e/roku-app/components/MainScene.brs(1219)
+C:/Users/adcueto/OneDrive/Documents/ChatGPT/LUMIN-TV/revision-r5-1f7782e/roku-app/components/MainScene.brs(1221,15-21): 'Dot' Operator attempted with invalid BrightScript Component or interface reference.
+
+el arnes no termino o el interprete reporto errores: no se acepta el resultado
+TOTAL: escena.brs: 0 comprobaciones, 0 fallos

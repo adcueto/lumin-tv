@@ -1,0 +1,36 @@
+interprete: C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r4-ce4716f\deps\node\node_modules\.bin\brs.cmd
+--- escena.brs contra C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r6-3a1eaf9\MainScene-base-con-asidero.brs
+
+== B5A-QA-02 recargar con respuesta identica: la reproduccion arranca sin esperar
+  ok    primera lista aplicada
+  ok    estaba en el tercer elemento; fue c.jpg
+  ok    latido con comando n=2
+  FALLA el video se puso a reproducir en el acto; control=stop
+  FALLA desde el primer elemento; fue c.jpg
+  ok    bloqueos olvidados
+  ok    se pidio un refresco al servidor
+  ok    segmentos reconstruidos (videos encadenados + foto)
+  ok    respuesta identica: sin evento (como en SceneGraph)
+  FALLA y la reproduccion sigue donde arranco
+
+== recargar y despues una lista distinta: se reconstruye una sola vez mas
+  ok    reinicio inmediato
+  ok    lista distinta si notifica
+  ok    y se aplica por el camino normal; fue x.jpg
+
+== recargar justo antes de perder la red: reproduce lo que tiene, sin lamina
+  ok    sigue reproduciendo desde el primer elemento
+  ok    no aparece la lamina: hay lista y contenido
+  ok    el estado reporta 'sin red' para el proximo latido
+
+== recargar sin haber recibido nunca una lista: lamina, no pantalla negra
+  FALLA lamina visible
+  ok    y se pide la lista
+  ok    al llegar la primera lista se reproduce
+
+== recargar no vuelve a ejecutar el comando que lo provoco
+  ok    mismo n: no se recarga de nuevo; consultas=1
+  ok    ultimo comando consumido = 2
+RESUMEN: 21 comprobaciones, 4 fallos
+
+TOTAL: escena.brs: 21 comprobaciones, 4 fallos

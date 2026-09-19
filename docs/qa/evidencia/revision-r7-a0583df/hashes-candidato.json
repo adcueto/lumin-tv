@@ -1,0 +1,12 @@
+{
+  ".github/workflows/verificacion.yml": "ff1a775950b49f15010ad1db53d90046739579d2c0fc474cc12e0019829f307a",
+  "docs/coordinacion/13-diseno-B3-postgresql.md": "9add4ecff58284b92a87a89aa95b045b9ed01410af31bca37828f637343b6247",
+  "docs/coordinacion/20-entrega-B5a-estado-y-operacion.md": "9a8a024c25256ed7eebbc61345ac330cfee8962f617a9019de276928cd0926c2",
+  "docs/coordinacion/22-rf26-destinos-de-lista.md": "d9afe910a687e82a9596ecf394eb867b5fbc6c088c86de74ae5613b7a66d73ab",
+  "docs/diseno-panel/README.md": "d2556a3da941e7fe5389e5b331859d81d54ca05f4f603edafe2337d2ae6d7438",
+  "docs/diseno-panel/capturas/escritorio-listas.png": "93bbad9bebd60cff26f2ebdacc89260c7e169f635baa7980a70da360c07a7ee9",
+  "docs/diseno-panel/prototipo.html": "023c28e193b26a15c2dd14c99e7efcbbe72531dbf935d679a620ade92d25e04a",
+  "docs/reproductor-continuidad.md": "bdb20dc56ff38b179e014c7af72dbb5e32e0f3dbe28bad8d4b12b3d94386f5b0",
+  "servidor/ensayos_b3/README.md": "46157fefda32ce65db52b579e037461fb040e3965c4427568bbd4578bb13b7c3",
+  "servidor/ensayos_b3/test_ensayo_sesiones.py": "3e91128a1cd72b0f2808fa8a160557b8270ae2049fc18bb8d024ad629cbdb346"
+}

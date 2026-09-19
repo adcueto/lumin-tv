@@ -1,0 +1,103 @@
+interprete: C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r4-ce4716f\deps\node\node_modules\.bin\brs.cmd
+--- planificacion.brs contra C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r6-3a1eaf9\roku-app\components\CacheTask.brs
+
+== R3-B1-01 reintento autonomo a los 30 s sin nuevos mensajes
+  ok    primer intento inmediato
+  ok    tras fallar, m.activo queda vacio
+  ok    la URL vuelve a la cola (antes: rechazada por creerse activa)
+  ok    milisegundosHastaElSiguiente = 5000, no -1 (antes: -1, espera infinita); fue 5000
+  ok    a los 29.999 s todavia no reintenta
+  ok    a los 30 s reintenta sin que llegue ningun mensaje
+
+== R3-B1-01 secuencia 30/60/120/240/300 s, seis intentos, luego agotado
+  ok    exactamente 6 intentos; fueron 6
+  ok    instantes 0,30,90,210,450,750 s; fueron 0,30,90,210,450,750
+  ok    estado final: terminal 'agotado'
+  ok    nada pendiente: el bucle esperaria un mensaje
+
+== agotado se reanima al reconectar, no antes
+  ok    reconciliar con la misma lista no reanima un agotado
+  ok    reconectado: intento inmediato
+  ok    y esta vez queda en cache
+  ok    el registro olvida lo que ya esta en disco
+
+== R2-B1-02 reconciliar durante la descarga: sin duplicar el activo
+  ok    la URL aparece una sola vez en la cola; aparecio 1
+  ok    un solo intento contado
+  ok    reintento programado a 30 s, no inmediato
+  ok    no salta la espera
+  ok    segundo intento a los 30 s
+
+== R2-B1-02 reconciliar con la misma lista conserva intentos y espera
+  ok    dos intentos
+  ok    cinco reconciliaciones identicas: siguen siendo 2 intentos
+  ok    la fecha del reintento no cambia
+  ok    no se lanzo ninguna descarga extra
+
+== R3-B1-02 sin_espacio no se libera con la misma lista
+  ok    queda terminal sin_espacio
+  ok    diez reconciliaciones identicas en 10 min: sigue en 1 intento; fueron 1
+  ok    sigue terminal
+
+== R3-B1-02 sin_espacio se reintenta al cambiar el conjunto de la lista
+  ok    lista distinta: nuevo intento de la URL en sin_espacio
+  ok    y termina en cache
+
+== R3-B1-02 sin_espacio se reintenta si la reconciliacion libero espacio
+  ok    lo no deseado se desalojo
+  ok    espacio liberado de verdad: nuevo intento
+
+== 404 sostenido: un intento, cuarentena de 30 min, luego uno mas
+  ok    29 reconciliaciones en 29 min: un solo intento; fueron 1
+  ok    a los 30 min, un intento mas
+
+== una URL que sale de la lista se olvida y libera su espacio
+  ok    descargado
+  ok    al salir de la lista se borra
+  ok    y se olvida su registro
+
+== B5a vaciar cache: borra medios, conserva la lista guardada y vuelve a bajar
+  ok    los dos medios en cache
+  ok    medios borrados
+  ok    la lista guardada NO se borra
+  ok    registro y cola vacios
+  ok    se anuncia el vaciado y 0 bytes
+  ok    se vuelven a bajar los dos
+  ok    y quedan en cache otra vez
+RESUMEN: 42 comprobaciones, 0 fallos
+
+--- escena.brs contra C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV\revision-r6-3a1eaf9\roku-app\components\MainScene.brs
+
+== B5A-QA-02 recargar con respuesta identica: la reproduccion arranca sin esperar
+  ok    primera lista aplicada
+  ok    estaba en el tercer elemento; fue c.jpg
+  ok    latido con comando n=2
+  ok    el video se puso a reproducir en el acto; control=play
+  ok    desde el primer elemento; fue a.mp4
+  ok    bloqueos olvidados
+  ok    se pidio un refresco al servidor
+  ok    segmentos reconstruidos (videos encadenados + foto)
+  ok    respuesta identica: sin evento (como en SceneGraph)
+  ok    y la reproduccion sigue donde arranco
+
+== recargar y despues una lista distinta: se reconstruye una sola vez mas
+  ok    reinicio inmediato
+  ok    lista distinta si notifica
+  ok    y se aplica por el camino normal; fue x.jpg
+
+== recargar justo antes de perder la red: reproduce lo que tiene, sin lamina
+  ok    sigue reproduciendo desde el primer elemento
+  ok    no aparece la lamina: hay lista y contenido
+  ok    el estado reporta 'sin red' para el proximo latido
+
+== recargar sin haber recibido nunca una lista: lamina, no pantalla negra
+  ok    lamina visible
+  ok    y se pide la lista
+  ok    al llegar la primera lista se reproduce
+
+== recargar no vuelve a ejecutar el comando que lo provoco
+  ok    mismo n: no se recarga de nuevo; consultas=1
+  ok    ultimo comando consumido = 2
+RESUMEN: 21 comprobaciones, 0 fallos
+
+TOTAL: planificacion.brs: 42 comprobaciones, 0 fallos | escena.brs: 21 comprobaciones, 0 fallos

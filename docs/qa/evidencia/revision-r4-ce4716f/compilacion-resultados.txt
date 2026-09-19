@@ -1,0 +1,6 @@
+[[90m07:59:26:580 PM[39m] No bsconfig.json file found, using default options
+[[90m07:59:26:592 PM[39m] Loading 0 plugins for cwd "C:\Users\adcueto\OneDrive\Documents\ChatGPT\LUMIN-TV" []
+[[90m07:59:26:600 PM[39m] Parsing files
+[[90m07:59:26:770 PM[39m] Parsing files finished. ([34m169.539ms[39m)
+[[90m07:59:26:771 PM[39m] Validating project
+[[90m07:59:26:808 PM[39m] Validating project finished. ([34m36.414ms[39m)

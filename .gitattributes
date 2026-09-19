@@ -1,0 +1,4 @@
+# Preserve archived QA evidence and historical copies byte-for-byte.
+docs/qa/evidencia/** -text
+docs/arquitectura/referencias/** -text
+docs/coordinacion/historico-codex/** -text

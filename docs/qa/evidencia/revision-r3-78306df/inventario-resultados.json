@@ -1,0 +1,8 @@
+{
+  "valid_exit": 0,
+  "valid_inputs_unchanged": true,
+  "sentinel_credentials_omitted": true,
+  "duplicate_suffix_rendering": 5,
+  "missing_directory_exit": 0,
+  "missing_directory_output": "Inventario de solo lectura sobre C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r3-78306df\\directorio-inexistente  ·  2026-09-16 14:04\npantallas: 0   sucursales: 0   usuarios: 0\n\n== D1 · Pantallas con numero repetido ==\n  ninguno\n\n== Todas las pantallas (referencia) ==\n\n== D2 · Usuarios cuyo alcance efectivo requiere decision ==\n  ninguno: todos los operadores declaran solo sucursales existentes\n\n== Todos los usuarios (referencia, sin credenciales) ==\n\nNo se modifico ningun archivo.\n"
+}

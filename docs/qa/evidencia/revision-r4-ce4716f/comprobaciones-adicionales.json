@@ -1,0 +1,16 @@
+{
+  "B3-R3-01": {
+    "membresias_visibles": 1,
+    "consulta_orden_documentado": 0,
+    "consulta_empresa_parametrizada": 1
+  },
+  "B3-R3-02": {
+    "revocada_en_pg": true,
+    "aceptada_por_610_con_ultimo_espejo": true
+  },
+  "B3-R3-03": {
+    "modelo_contrato": true,
+    "estado": "hecho",
+    "archivo_existe": false
+  }
+}

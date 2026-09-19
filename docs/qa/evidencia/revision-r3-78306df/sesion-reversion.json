@@ -1,0 +1,7 @@
+{
+  "synthetic_legacy_session": true,
+  "valid_before_logout": true,
+  "valid_after_logout": false,
+  "valid_after_frozen_restore": true,
+  "note": "Demostracion en servidor aislado, no ejecucion de B3 ni produccion"
+}

@@ -1,0 +1,130 @@
+[
+  {
+    "fuente": "base",
+    "metodo": "POST",
+    "accion": "recargar",
+    "rol": "usuario",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "base",
+    "metodo": "POST",
+    "accion": "recargar",
+    "rol": "admin",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "base",
+    "metodo": "POST",
+    "accion": "vaciar_cache",
+    "rol": "usuario",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "base",
+    "metodo": "POST",
+    "accion": "vaciar_cache",
+    "rol": "admin",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "base",
+    "metodo": "PUT",
+    "accion": "recargar",
+    "rol": "usuario",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "base",
+    "metodo": "PUT",
+    "accion": "recargar",
+    "rol": "admin",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "base",
+    "metodo": "PUT",
+    "accion": "vaciar_cache",
+    "rol": "usuario",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "base",
+    "metodo": "PUT",
+    "accion": "vaciar_cache",
+    "rol": "admin",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "candidato",
+    "metodo": "POST",
+    "accion": "recargar",
+    "rol": "usuario",
+    "http": 403,
+    "avance_n": 0
+  },
+  {
+    "fuente": "candidato",
+    "metodo": "POST",
+    "accion": "recargar",
+    "rol": "admin",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "candidato",
+    "metodo": "POST",
+    "accion": "vaciar_cache",
+    "rol": "usuario",
+    "http": 403,
+    "avance_n": 0
+  },
+  {
+    "fuente": "candidato",
+    "metodo": "POST",
+    "accion": "vaciar_cache",
+    "rol": "admin",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "candidato",
+    "metodo": "PUT",
+    "accion": "recargar",
+    "rol": "usuario",
+    "http": 403,
+    "avance_n": 0
+  },
+  {
+    "fuente": "candidato",
+    "metodo": "PUT",
+    "accion": "recargar",
+    "rol": "admin",
+    "http": 200,
+    "avance_n": 1
+  },
+  {
+    "fuente": "candidato",
+    "metodo": "PUT",
+    "accion": "vaciar_cache",
+    "rol": "usuario",
+    "http": 403,
+    "avance_n": 0
+  },
+  {
+    "fuente": "candidato",
+    "metodo": "PUT",
+    "accion": "vaciar_cache",
+    "rol": "admin",
+    "http": 200,
+    "avance_n": 1
+  }
+]

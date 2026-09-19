@@ -1,0 +1,30 @@
+{
+  "sha": "ce4716f07b1a14c98c7dc6a9a4d4494b6871d3c2",
+  "archivos": {
+    "servidor/ensayos_b3/comun.py": "4d263ebaf6da817e8069ad548d07f44e110642e4c3531d4b8f93890ea5c20505",
+    "servidor/ensayos_b3/ddl_minimo.sql": "136fd0b4c89e4a86d4711544a1a8100e635ec7284ebb8ab5874ea4ab0be0b041",
+    "servidor/ensayos_b3/README.md": "485f125de606ba4e3089fcb693c21730547d559284ba5cfc3f314564bafaee32",
+    "servidor/ensayos_b3/test_ensayo_espejo.py": "d7eb1432da3b2511fc091939d1fcfe32f2dbc236d2071cfd11578b489c406ace",
+    "servidor/ensayos_b3/test_ensayo_rls.py": "754fe6aad60ce406db207c989a4f4e5042e75836171b241a5307c2bb5652c4c5",
+    "servidor/ensayos_b3/test_ensayo_sesiones.py": "9ef258c706adfaa7a4789224d675810d1c755338aa4b4d5dfff37ef618b47311",
+    "servidor/tests/arnes.py": "ed812b30239da545b44b8b94a60eb0ad18e4a5d4b6e74c90e07ac9d3ddbc42e1",
+    "servidor/tests/comparar_con_base.py": "639b7538d2d6a1f2eb240d97588bf6f5c44abdfac0d8d8672b666e9560ec2880",
+    "servidor/tests/conftest.py": "9663b46093e625d830669fc0cf256b9505398c08afc44ea3edec14d90d9307eb",
+    "servidor/tests/requirements.txt": "22e1851ae776543e2fbc098082e583415c47a91191fea5a134d67c1f70846eb1",
+    "servidor/tests/test_b2_higiene.py": "baba57f85d64be9e6ecb876445b281be4daf7148c9cf69b69629f1aa950adfb3",
+    "servidor/tests/test_inventario_decisiones.py": "621908f5962b120bb653ae7568c3576377540efec57c86255efc7c863ce1d53b",
+    "roku-app/components/Cache.brs": "42a16301ad5ef56df612ec033d0d1766881c7882b9ee7f767fd9a4f4b16dc62d",
+    "roku-app/components/CacheTask.brs": "c79c2fcf29ca01a1a91cd95ca37aa8fe5479d80a96aeb33e26488f8a834da663",
+    "roku-app/components/CacheTask.xml": "018c06ac62780b06bd23c0d42b53f1ce6c47cbbd989322387d78bb32ac72f883",
+    "roku-app/components/MainScene.brs": "b2d92c4d0d4f6a003bbb45fd68e62ff41a0c83c11ef658ee78a0305f16a79bce",
+    "roku-app/components/MainScene.xml": "2f4eb04b9b1619690e2d15c18b1e923553bd4029ca145d5f69e843bc2a8c0dfb",
+    "roku-app/components/PlaylistTask.brs": "968d9b3b084cb04fd94f17b01d2c94f7547f968af1b5600ee30f8ab269e42432",
+    "roku-app/components/PlaylistTask.xml": "98604aff4812c01903fa277765a70bed345e41e85f517ce7f08a88b29300bcdf",
+    "roku-app/pruebas/Cache_simulado.brs": "2f243588688ddea6910a7a429c4ff487b3ea840621dd4af926a0296d3c2baf1c",
+    "roku-app/pruebas/correr.py": "b51a2b701471f1b17ea9eed8b5f04b9ae819c4978fe186c927bab40d7b55d7c1",
+    "roku-app/pruebas/planificacion.brs": "6474788174a796a5ebef6509f620a274a50059b4919aee9cd31b0a84de147b46",
+    "servidor/herramientas/inventario_decisiones.py": "5ec392397824bc8af92709cb4df072f8a38794d2b09fcc55c69bf1abb4b96e38",
+    "docs/coordinacion/13-diseno-B3-postgresql.md": "4de7d7dea4f5e3626f53490151f45c5112cd1e2b91ce783ab0019a4cc482ab39",
+    "roku-app/manifest": "71d581d94ec97bf32e9bf0ca646f72c498807153945f2919aadfafab9db6a935"
+  }
+}

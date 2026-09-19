@@ -1,0 +1,424 @@
+Actúa como coordinador técnico y responsable de QA del proyecto LUMIN TV. Este mensaje transfiere el contexto de una conversación anterior de ChatGPT.
+
+## 1. Propietario y objetivo
+
+Soy Adrián Pérez Cueto, propietario de LUMIN – Beauty Studio en Querétaro y del POS LUMIA.
+
+Estoy desarrollando LUMIN TV para venderlo como una plataforma SaaS de publicidad, contenido y anuncios de turnos en televisiones, con suscripciones mensuales.
+
+Debe servir para salones, barberías, bancos, consultorios, taquerías, restaurantes y comercios. LUMIN será la única empresa piloto persistente al inicio.
+
+## 2. Responsabilidades del equipo
+
+- **Codex: coordinación técnica y QA.** Organiza prioridades, tareas, dependencias y contratos API. Revisa código, seguridad, integración, pruebas y entregas. Reporta defectos con evidencia y determina si cada entrega está aprobada.
+- **Claude: desarrollo principal.** Arquitectura, backend, base de datos, multiempresa, autenticación, permisos, planes, suscripciones, integración LUMIA y reproductores.
+- **Antigravity: frontend y experiencia visual.** Paneles administrativos, página comercial, componentes, navegación, diseño responsive y conexión con las API acordadas.
+
+Codex no debe asumir el desarrollo principal ni reescribir trabajo de los otros agentes sin necesidad o acuerdo. Puede crear documentación, pruebas de QA y herramientas de verificación.
+
+No supongas que puedes comunicarte directamente con Claude o Antigravity. Comprueba los canales disponibles y utiliza documentos compartidos cuando corresponda.
+
+## 3. Carpetas y límites
+
+Proyecto principal:
+
+`C:\Users\adcueto\Claude\lumin-tv`
+
+POS LUMIA, únicamente como referencia de solo lectura:
+
+`C:\Users\adcueto\Claude\Lumin\_Proyecto\_Cowork\06-belia-app`
+
+Comprueba ambas rutas. No inventes una ruta alternativa si alguna no existe.
+
+Trabaja en LUMIN TV. No modifiques LUMIA, sus datos, configuraciones, integraciones ni producción. Si una integración necesita cambios del lado de LUMIA, documenta una tarea separada.
+
+La sesión anterior de ChatGPT estaba en un entorno remoto: no tuvo acceso a estas carpetas, no revisó el código y no creó archivos en el repositorio. Todo lo siguiente es especificación y propuesta, no evidencia de funcionalidades implementadas.
+
+## 4. Estado conocido, informado por mí
+
+- LUMIN TV ya existe.
+- Ya tiene un reproductor para Roku TV.
+- Ya incluye endpoints GET y POST.
+- Falta desarrollar soporte para Android TV/Google TV.
+- Debe integrarse con el POS LUMIA.
+- Quiero mejorar y ampliar lo existente.
+
+Antes de modificar, inspecciona arquitectura, instrucciones del repositorio, estado de Git, endpoints, autenticación, modelos, frontend, reproductor y pruebas.
+
+No reconstruyas desde cero lo que ya funciona. No inventes contratos API. Conserva compatibilidad con Roku o prepara una transición versionada si fuera necesaria.
+
+## 5. Modelo multiempresa
+
+Jerarquía:
+
+Plataforma → Empresa → Sucursal → Pantallas
+
+Yo soy el superadministrador de toda la plataforma.
+
+Cada empresa tiene su portal, usuarios, sucursales, pantallas, contenido, campañas, estadísticas y suscripción. El aislamiento debe aplicarse en backend, archivos, dispositivos y procesos de fondo, no solo mediante filtros visuales.
+
+LUMIN debe ser una empresa normal configurada en la base, sin lógica exclusiva programada directamente en el código.
+
+Las pruebas de aislamiento pueden crear empresas temporales únicamente en entornos de pruebas aislados.
+
+## 6. Roles
+
+**Superadministrador**
+
+- Administrar empresas y suscripciones.
+- Crear y editar planes, precios, cuotas y complementos.
+- Registrar pagos.
+- Suspender y reactivar empresas.
+- Consultar consumo, dispositivos, incidencias y actividad.
+- Gestionar excepciones comerciales.
+- Acceder en modo soporte de manera explícita y auditada.
+- Bloquear por seguridad una empresa, sucursal o dispositivo.
+
+**Administrador de empresa**
+
+- Administrar su empresa y sus sucursales.
+- Gestionar usuarios y permisos.
+- Administrar pantallas, contenido, listas, campañas y módulos contratados.
+- Consultar estadísticas y suscripción.
+
+**Operador de sucursal**
+
+- Acceder únicamente a las sucursales y funciones asignadas.
+
+**Dispositivo/reproductor**
+
+- Autenticación propia, permisos mínimos y token revocable.
+- Sin acceso al panel administrativo ni a datos ajenos.
+
+## 7. Panel de la empresa
+
+Quiero un panel profesional con menú lateral, pestañas dentro de módulos y selector global de sucursal.
+
+Módulos:
+
+1. Resumen y estadísticas.
+2. Sucursales.
+3. Pantallas.
+4. Listas de reproducción.
+5. Contenido en la nube.
+6. Campañas programadas.
+7. Anuncio y operación de turnos.
+8. Configuración de turnos.
+9. Mensajes en pantalla.
+10. Empleado del mes.
+11. Menú digital.
+12. Usuarios y permisos.
+13. Suscripción y complementos.
+14. Configuración.
+
+Diseño limpio, responsive, accesible, con estados de carga, vacíos y errores. Tablas, tarjetas, filtros y formularios consistentes.
+
+La plataforma tendrá identidad neutral y personalización por empresa. Como referencia para la empresa piloto LUMIN, se propuso esta paleta:
+
+`#D6437F`, `#B03578`, `#FDE7F1`, `#FFF7FB`, `#F7F7F8`, `#33121F`, `#8A6478`, `#0F7B4D`, `#8A6100`.
+
+## 8. Funciones principales
+
+**Pantallas**
+
+Nombre, sucursal, orientación, resolución, vinculación segura, conexión, última actividad, contenido actual, asignaciones, vista previa y errores.
+
+Distinguir resincronizar contenido, reiniciar la aplicación y reiniciar el dispositivo. Solo ofrecer acciones soportadas realmente por cada plataforma.
+
+**Biblioteca**
+
+Imágenes y videos, carpetas, etiquetas, búsqueda, vista previa, duración, formato, tamaño, validaciones y almacenamiento utilizado. Evitar eliminación accidental de archivos en uso.
+
+**Listas**
+
+Ordenar mediante arrastrar y soltar, duración por imagen, duración total, vista previa, duplicado y asignación por pantalla o grupo. Debe existir contenido de respaldo ante listas vacías o fallidas.
+
+**Campañas**
+
+Inicio, finalización, días, horarios, zona horaria de sucursal, destinos, prioridades y calendario. Definir reglas deterministas para conflictos y contenido de respaldo.
+
+**Mensajes**
+
+Texto, posición, color, duración, prioridad, programación y destinos. Permitir banner, cintillo o pantalla completa y retirada inmediata cuando el dispositivo esté conectado.
+
+**Estadísticas**
+
+Datos reales de conexión y reproducción, filtros y reportes por campaña, pantalla y sucursal. Registrar eventos sin duplicados.
+
+No presentar reproducciones como personas que vieron el anuncio. No inventar métricas, ventas atribuidas ni datos de demostración como reales.
+
+## 9. Turnos para distintos giros
+
+Usar un motor común con etiquetas, estados y plantillas configurables:
+
+- Salones: cliente, especialista, servicio y estación.
+- Bancos: folio, ventanilla, área y prioridad.
+- Consultorios: folio o nombre abreviado y consultorio.
+- Taquerías/restaurantes: pedido, en preparación, listo y entregado.
+- Comercios: turno, caja o módulo.
+
+Funciones: crear turno, llamar, repetir, atender, cancelar, cola e historial.
+
+Configurar prefijos, numeración, reinicio diario, áreas, pantallas, sonidos, voz opcional, volumen, duración, repeticiones y apariencia.
+
+Los llamados deben convivir con la publicidad y permitir volver correctamente al contenido. Mostrar nombres debe ser opcional; permitir operar únicamente con folios.
+
+No mostrar tiempos estimados de espera sin una base de cálculo definida.
+
+## 10. Integración opcional con LUMIA
+
+El conector LUMIA será un complemento cobrable por sucursal. LUMIN TV también debe funcionar sin el POS.
+
+Verifica los GET y POST existentes y determina qué eventos y datos pueden intercambiarse realmente.
+
+Posibles usos, sujetos a contratos disponibles:
+
+- Llamados y estados de atención.
+- Estaciones y especialistas.
+- Pedidos y estados.
+- Datos para reconocimientos.
+
+Cada conexión debe identificar empresa y sucursal en ambos sistemas, con permisos, autenticación, auditoría, reintentos y prevención de duplicados.
+
+El conector transporta datos; los módulos definen su uso. Ejemplo: llamado automático desde LUMIA requiere Turnos + Conector LUMIA.
+
+No cobres por módulos dependientes sin explicar al cliente qué necesita contratar. La licencia del POS LUMIA es independiente.
+
+## 11. Complementos especializados
+
+**Empleado del mes**
+
+Foto, nombre, sucursal, periodo, reconocimiento, plantillas, programación e historial.
+
+Selección manual inicialmente. Selección basada en LUMIA solo cuando existan datos, criterios configurables y aprobación antes de publicar.
+
+No mostrar salarios ni datos privados.
+
+Se cobra el módulo de gestión y automatización; subir una imagen común de reconocimiento sigue siendo parte de la publicidad normal.
+
+**Menú digital**
+
+Productos, precios, categorías, disponibilidad y horarios de menú. La integración automática depende de contratos comprobados.
+
+Se cobra el módulo editable y dinámico; subir una imagen de menú sigue siendo contenido normal.
+
+## 12. Propuesta comercial inicial
+
+Estos precios fueron propuestos por ChatGPT; todavía deben validarse contra costos de infraestructura, transferencia, almacenamiento y soporte. No representan tarifas ya publicadas ni autorizan cobros reales.
+
+Moneda: MXN. Definir explícitamente el tratamiento de impuestos antes de publicar.
+
+Todos los límites siguientes son totales por empresa, salvo indicación distinta.
+
+| Concepto | Básica | Media | Avanzada |
+|---|---:|---:|---:|
+| Mensualidad | $249 | $599 | $1,199 |
+| Sucursales | 1 | 2 | 5 |
+| Pantallas activas | 1 | 3 | 6 |
+| Usuarios administrativos | 2 | 5 | 15 |
+| Listas de reproducción | 5 | 20 | 60 |
+| Videos almacenados | 20 | 100 | 300 |
+| Imágenes almacenadas | 100 | 500 | 1,500 |
+| Almacenamiento total | 2 GB | 10 GB | 30 GB |
+| Campañas activas o programadas | 3 | 15 | 50 |
+| Historial estadístico | 30 días | 90 días | 365 días |
+
+Diferenciación propuesta:
+
+- Básica: programación por días y horas, mensajes manuales y estadísticas básicas.
+- Media: calendario, prioridades, mensajes programados y estadísticas por campaña/sucursal.
+- Avanzada: reglas y grupos de pantallas, comparativas y exportación.
+
+La seguridad, el aislamiento y los permisos mínimos deben existir en todos los planes.
+
+Roku y Android TV/Google TV estarán incluidos según disponibilidad y compatibilidad validada; no se cobra un extra por elegir sistema operativo.
+
+Complementos propuestos:
+
+| Complemento | Precio mensual |
+|---|---:|
+| Pantalla adicional | $149 por pantalla |
+| Sucursal adicional, sin pantalla | $99 por sucursal |
+| Turnos | $199 por sucursal |
+| Conector LUMIA | $149 por sucursal |
+| Empleado del mes | $79 por sucursal |
+| Menú digital | $129 por sucursal |
+| 10 listas adicionales | $49 por empresa |
+| 50 videos adicionales | $79 por empresa |
+| 10 GB adicionales | $99 por empresa |
+| 5 usuarios adicionales | $49 por empresa |
+
+Los videos se cuentan como archivos guardados, no por reproducción. Ampliar número de videos no amplía almacenamiento.
+
+Una licencia de pantalla corresponde a un dispositivo vinculado y activo, aunque varias pantallas reproduzcan la misma lista.
+
+Ejemplo: Básica + Turnos = $448 mensuales. Con Conector LUMIA = $597, más los impuestos que correspondan según la política comercial finalmente definida.
+
+Clientes con requisitos empresariales especiales tendrán cotización específica. No prometer certificaciones, disponibilidad contractual o integración bancaria sin validación.
+
+## 13. Suscripciones y cuotas
+
+Estados propuestos: prueba, activa, pago pendiente, vencida, suspendida y cancelada. Definir transiciones y efectos sin confundir estado de pago con estado de acceso.
+
+Separar:
+
+- Catálogo y versión de precios.
+- Plan contratado.
+- Complementos y cantidades.
+- Capacidades habilitadas.
+- Cuotas.
+- Consumo.
+- Vigencia.
+- Excepciones autorizadas.
+
+Todo será configurable desde el panel del superadministrador. No duplicar precios en frontend y backend.
+
+Validar cuotas en servidor y evitar superar límites mediante solicitudes simultáneas.
+
+Mostrar consumo y avisos. No realizar cargos adicionales sin aceptación. No eliminar contenido automáticamente al reducir el plan.
+
+Política inicial propuesta:
+
+- Pagos registrados manualmente por el superadministrador.
+- Preparación para pasarela recurrente posterior.
+- Altas y ampliaciones muestran importe y fecha efectiva antes de confirmar.
+- Reducciones y cancelaciones al siguiente periodo.
+- Área de suscripción accesible para regularizar pagos.
+- Suspensión y reactivación auditadas.
+
+Definir tolerancia offline y autorización con caducidad para reproductores. No prometer bloqueo inmediato de dispositivos desconectados.
+
+Ante suspensión, mostrar al público una pantalla neutral; nunca exponer adeudos.
+
+LUMIN tendrá acceso a los módulos necesarios para probarlos mediante configuración administrativa explícita, sin excepciones ocultas en el código.
+
+## 14. Roku y Android TV/Google TV
+
+Preservar el reproductor Roku existente.
+
+Desarrollar Android TV/Google TV sobre contratos comunes de backend, con:
+
+- Vinculación temporal segura.
+- Navegación por control remoto.
+- Reproducción horizontal y vertical.
+- Caché según capacidad real.
+- Reconexión y recuperación.
+- Sincronización de listas y campañas.
+- Turnos y mensajes.
+- Heartbeat.
+- Reportes de reproducción.
+- Tokens renovables y revocables.
+
+Crear matriz de dispositivos, versiones y funciones verificadas. Comprobar formatos, codecs, almacenamiento, limitaciones de inicio automático, segundo plano, distribución y actualización.
+
+No anunciar compatibilidad universal. Android TV/Google TV no incluye automáticamente Samsung Tizen, LG webOS u otros sistemas.
+
+Las pruebas en simulador no sustituyen la validación en dispositivos físicos.
+
+## 15. Página web comercial
+
+Antigravity desarrollará una web pública conectada al producto:
+
+- Inicio.
+- Soluciones por giro.
+- Funciones.
+- Complementos.
+- Comparativa de planes.
+- Calculadora de precio.
+- Compatibilidad.
+- Integración LUMIA.
+- Preguntas frecuentes.
+- Solicitud de demostración.
+- Contacto.
+- Inicio de sesión.
+- Términos y privacidad antes de lanzamiento.
+
+Tabla de planes y calculadora consumirán el mismo catálogo del backend.
+
+Formularios funcionales, sin simular envíos. No inventar testimonios, clientes ni certificaciones.
+
+Mostrar “próximamente” en funciones no disponibles. Durante el piloto, no habilitar cobros públicos reales ni publicar comercialmente sin mi autorización.
+
+## 16. Seguridad y criterios de QA
+
+Prioridades de revisión:
+
+1. Aislamiento entre empresas en API, archivos, pantallas y procesos.
+2. Roles y permisos.
+3. Cuotas, suscripciones, suspensión y reactivación.
+4. Compatibilidad con Roku y endpoints existentes.
+5. Integración LUMIA y prevención de eventos duplicados.
+6. Programación por zona horaria y conflictos.
+7. Continuidad offline y recuperación.
+8. Precisión de estadísticas.
+9. Frontend conectado a datos reales.
+10. Migraciones y protección de datos.
+
+No confiar en identificadores de empresa enviados por el cliente sin comprobar pertenencia.
+
+No publicar secretos. Las credenciales y tokens que deban persistirse necesitan protección adecuada; no asumir que todos pueden trasladarse a variables de entorno.
+
+No ejecutar pruebas destructivas en producción ni usar datos reales para pruebas que los alteren.
+
+## 17. Coordinación y entregas
+
+Inspecciona primero si ya existe un protocolo de coordinación. Reutilízalo cuando sea adecuado.
+
+Si no existe, prepara en el repositorio:
+
+- Plan maestro y prioridades.
+- Tablero de tareas.
+- Instrucciones para Claude.
+- Instrucciones para Antigravity.
+- Contratos API.
+- Entregas a QA.
+- Resultados y defectos de QA.
+- Decisiones y pendientes.
+
+Cada tarea debe tener identificador, responsable, alcance, dependencias y criterios de aceptación.
+
+Cada entrega debe señalar rama/commit, cambios, migraciones, pruebas ejecutadas y limitaciones.
+
+Flujo:
+
+Pendiente → En desarrollo → Entregado a QA → Correcciones o Aprobado
+
+Usar ramas/worktrees separados cuando ambos desarrolladores trabajen en paralelo. No sobrescribir cambios ajenos ni restaurar archivos sin revisar.
+
+QA debe revisar una versión identificable. Diferenciar “no probado”, “falló” y “aprobado”. No aprobar solo porque compila o porque el desarrollador afirma que funciona.
+
+No hay monitoreo automático ni comunicación entre agentes ya configurados: compruébalos antes de prometerlos.
+
+## 18. Orden inicial de trabajo
+
+1. Verificar acceso local, instrucciones y estado de Git.
+2. Auditar el estado real, especialmente Roku y GET/POST.
+3. Identificar diferencias entre lo existente y esta especificación.
+4. Acordar arquitectura, contratos y responsabilidades.
+5. Resolver multiempresa, autenticación y permisos.
+6. Implementar planes, cuotas y complementos.
+7. Mejorar panel y operación existente.
+8. Integrar turnos por giro y LUMIA.
+9. Incorporar empleado del mes y menú digital.
+10. Desarrollar Android TV/Google TV.
+11. Integrar web comercial.
+12. Validar con LUMIN y preparar lanzamiento.
+
+Antigravity puede avanzar en estructura visual y componentes mientras Claude desarrolla backend, siempre usando contratos acordados. Los mocks de desarrollo deben estar claramente identificados y no presentarse como integración terminada.
+
+## 19. Tu primera tarea como Codex
+
+Empieza comprobando que puedes leer la carpeta de LUMIN TV. Luego:
+
+- Lee las instrucciones del repositorio.
+- Revisa Git sin alterar cambios existentes.
+- Identifica arquitectura y funciones reales.
+- Determina qué GET/POST y reproductor Roku existen.
+- Revisa LUMIA solo si es necesario para comprender la integración.
+- Prepara los documentos de coordinación.
+- Redacta la primera entrega concreta para Claude y la primera para Antigravity.
+- Define las pruebas y criterios con los que evaluarás ambas.
+
+Avanza con la inspección y preparación autorizadas. Pregunta únicamente por información que no puedas obtener y que bloquee una decisión real.
+
+No afirmes que ya implementaste o verificaste algo sin evidencia.

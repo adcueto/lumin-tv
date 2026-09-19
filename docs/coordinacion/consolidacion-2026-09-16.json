@@ -1,0 +1,223 @@
+{
+  "fecha": "2026-09-16",
+  "destino": "C:\\Users\\adcueto\\Claude\\lumin-tv",
+  "operacion": "Copia documental sin borrar originales ni modificar producto/Git",
+  "excluido": "arboles candidato/base, caches y temporales de pruebas",
+  "archivos": [
+    {
+      "destino": "docs/coordinacion/16-coordinacion-agentes.md",
+      "origen": "Documento preparado por Codex para esta consolidacion",
+      "sha256": "8e3c32874f86acdef3ab1fec1a2b2278c0a4b96a1d42fac6fb19c22ab87cba6c"
+    },
+    {
+      "destino": "AGENTS.md",
+      "origen": "Documento preparado por Codex para esta consolidacion",
+      "sha256": "b9456a4ccd147a753297761e38b03790aeadee4139bae3faed1475bb0d6f3f01"
+    },
+    {
+      "destino": "CLAUDE.md",
+      "origen": "Documento preparado por Codex para esta consolidacion",
+      "sha256": "e45fab03365161cc1db9cd9bd70280fe4e470c64dfe7cfdeccd02e11ca45f35f"
+    },
+    {
+      "destino": "docs/INDICE-PROYECTO.md",
+      "origen": "Documento preparado por Codex para esta consolidacion",
+      "sha256": "53a7a38e4f0b7faa16aca1a1b117871c78230e7c1db1492fed9cd698ef6d07eb"
+    },
+    {
+      "destino": "docs/coordinacion/LEEME-PRIMERO.md",
+      "origen": "Documento preparado por Codex para esta consolidacion",
+      "sha256": "28a679bd2b2fb7cd714f54cdaa63abdbfe5aa173e61d4098d6a2aa8947661c5d"
+    },
+    {
+      "destino": "docs/qa/README.md",
+      "origen": "Documento preparado por Codex para esta consolidacion",
+      "sha256": "1d864838c7cede7f8e2e4f5488304b018c3675d74bd967d5b515438a4e152347"
+    },
+    {
+      "destino": "docs/arquitectura/README.md",
+      "origen": "Documento preparado por Codex para esta consolidacion",
+      "sha256": "0f9a3c5c5dafd5eec8ae38ddc55c8e5428e6a4eb0d50102757946b952b6e7033"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/01-inspeccion-inicial.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\01-inspeccion-inicial.md",
+      "sha256": "645f1856a2c3add00988ed57fe1e1c60f042234d8e6f80363720bd6685f43ea9"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/02-plan-y-tablero.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\02-plan-y-tablero.md",
+      "sha256": "7cccc449ebfde1da3abfe1b01884ebfed60456ddeb31c7c29e1cca220e272318"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/03-entrega-claude.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\03-entrega-claude.md",
+      "sha256": "2ccf4a34aab81ee8b162f28811fac836353ee518aee5973594a7a649aa490ff9"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/04-entrega-antigravity.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\04-entrega-antigravity.md",
+      "sha256": "84bb63d97acda00616463029bfd959adb780c3bc5162e4acc122cc3a68593570"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/05-contratos-api.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\05-contratos-api.md",
+      "sha256": "4b97b9ca727e272e099c94efba4b4705dc3d70f0a08bd10b2452008013a91c25"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/06-protocolo-y-qa.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\06-protocolo-y-qa.md",
+      "sha256": "cdcfe8410ab9ac2f7894c06a1a751ccbd4bf7dadd15d76eec73130981e88feb1"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/07-decisiones-y-pendientes.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\07-decisiones-y-pendientes.md",
+      "sha256": "209538511123364718ef13fa008fb44ebd6ee53e4fff890777f55ae8ab966371"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/08-encargo-original.txt",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\08-encargo-original.txt",
+      "sha256": "31dbddf3d868b8d34b3aac3af3c12aa26d9f5cb500dd5e97179725ed43e01d52"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/09-auditoria-codigo.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\09-auditoria-codigo.md",
+      "sha256": "f3b69f1ad98113aa9dc728d4e1ddc8b064b7e10994c01e2bc0eb4f0d90e1f839"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/10-revision-panel-vivo-y-encargo-claude.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\10-revision-panel-vivo-y-encargo-claude.md",
+      "sha256": "6e2de11864bf8934855a32237146db18beba92ee72f7f53b4fdd0ab2ce8ffbdb"
+    },
+    {
+      "destino": "docs/arquitectura/referencias/11-entrega-B1-continuidad-R3-78306df.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\11-entrega-B1-continuidad-R3-78306df.md",
+      "sha256": "e491bf25ad0ab272de073ea33dacce834dd4ae4e1f1c6ef9cc5b4db45ad3d449"
+    },
+    {
+      "destino": "docs/qa/informes/12-qa-B1-ceadf1d.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\12-qa-B1-ceadf1d.md",
+      "sha256": "be1642c2a38a03fc9da36b658d16e28375066de9e98a43ec08583b0c93412811"
+    },
+    {
+      "destino": "docs/arquitectura/referencias/13-diseno-B3-postgresql-rev2-78306df.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\13-diseno-B3-postgresql-rev2-78306df.md",
+      "sha256": "d90e457edd61f9e6973b5a41dc436d4e61c2c8e13624faa5d828f1afcef1efe1"
+    },
+    {
+      "destino": "docs/arquitectura/referencias/13-diseno-B3-postgresql.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\13-diseno-B3-postgresql.md",
+      "sha256": "e47369be5d77eac49a47a3d192b0c01233c2aa1c1c5d8ca57ed5425390984f7f"
+    },
+    {
+      "destino": "docs/qa/informes/13-qa-B2-0c00f35.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\13-qa-B2-0c00f35.md",
+      "sha256": "ab7027d91ade7521f4c2a1c66c9f27faa8a7a2c5691649690d13c25196e8d4a2"
+    },
+    {
+      "destino": "docs/qa/informes/14-qa-R2-y-diseno-B3-5c96845.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\14-qa-R2-y-diseno-B3-5c96845.md",
+      "sha256": "503387d95062b74147441bb1f96a2c48501c656defe5c1daf1e0df13c332d5fb"
+    },
+    {
+      "destino": "docs/qa/informes/15-qa-R3-y-diseno-B3-rev2-78306df.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\15-qa-R3-y-diseno-B3-rev2-78306df.md",
+      "sha256": "93995fc1ab64c2116b5ad759147d373b2d2c98dec94b322cb9ae7ea94f6116eb"
+    },
+    {
+      "destino": "docs/qa/evidencia/caracterizacion-inicial/qa-resultados.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\qa-resultados.json",
+      "sha256": "90ac5d19799069f3b96e3254dd33239da38e506bca554fb2f31ffc8ab3b330de"
+    },
+    {
+      "destino": "docs/qa/evidencia/caracterizacion-inicial/qa_caracterizacion.py",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\qa_caracterizacion.py",
+      "sha256": "4a05854bd281aca29510dc8f226b7fc22628175f1a4946a121afd65f85d4d9af"
+    },
+    {
+      "destino": "docs/coordinacion/historico-codex/README.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\README.md",
+      "sha256": "576e65ddfe1a4b25c40b1b7cf365eece6c2aa5ae70a160358451fc5a774a5700"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r2-5c96845/hashes.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r2-5c96845\\hashes.json",
+      "sha256": "33159553dd606e7cd6a3d1ebf160359d939cfcecec9ab19e117f39aa6f1967c4"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r2-5c96845/head.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r2-5c96845\\head.json",
+      "sha256": "60a50bf0888c57b844b11dcf8ef4ec5c39f18ec6b6829e39fe1ddf1226c46edb"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r2-5c96845/resultados-base.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r2-5c96845\\resultados-base.json",
+      "sha256": "1049b19328a0deb1869bb3f0beae319b8c1aa24aa63e6c227b818650cf4a37ca"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r2-5c96845/resultados-candidato.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r2-5c96845\\resultados-candidato.json",
+      "sha256": "91b9fc2276f356a0f1b112148e02c99c3058cc98354718abfb7524ddcd9bffd6"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r2-5c96845/revisar.py",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r2-5c96845\\revisar.py",
+      "sha256": "a7aaa54001d60c83e6bf6efb8ec03f2f30dd9b2ee0be6835ea57d9ed4b491962"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r3-78306df/hashes.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r3-78306df\\hashes.json",
+      "sha256": "0e5713d19f5fd11a6e52dc3f4ecee95c092fa0c90d62059bebfa3aca642acbe4"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r3-78306df/inventario-resultados.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r3-78306df\\inventario-resultados.json",
+      "sha256": "a21db68cbacbc067b792f78348bec4f8f4f26bf207bec84546302383ce8015a8"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r3-78306df/resultados-base.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r3-78306df\\resultados-base.json",
+      "sha256": "e3ec73e98266fa06d9cfbed5f9ea9aa4122f6eac83c45c32fb678da872ee2481"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r3-78306df/resultados-candidato.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r3-78306df\\resultados-candidato.json",
+      "sha256": "883d7df07104c640bf837b02f4cad8a56576197ec612ee60a4510ae08a8829b5"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r3-78306df/revisar.py",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r3-78306df\\revisar.py",
+      "sha256": "6af5342c5b59f1ba29265cacb922a1fa15cdc8bd1fcb35b508c140ddf3f4f4d9"
+    },
+    {
+      "destino": "docs/qa/evidencia/revision-r3-78306df/sesion-reversion.json",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\revision-r3-78306df\\sesion-reversion.json",
+      "sha256": "7fc6d7e53fe9a359b3c4216216353b78272ed32b155db973f1a5205d5f795011"
+    },
+    {
+      "destino": "docs/investigacion/2026-09-15-comparativa-producto-costos-integracion.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\investigacion\\2026-09-15-comparativa-producto-costos-integracion.md",
+      "sha256": "4c4cef67a56626e3ac90bb89e00423c4bc0bfe5ecbf15736d7c2f10029f98565"
+    },
+    {
+      "destino": "docs/investigacion/2026-09-15-estudio-v2-construir-integrar-o-revender.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\investigacion\\2026-09-15-estudio-v2-construir-integrar-o-revender.md",
+      "sha256": "82f5b654d8c73d69bc892275a4bb6e329bb8377e564b3cb1c62d78e9fad30b7c"
+    },
+    {
+      "destino": "docs/investigacion/2026-09-15-mercado-mexico-evidencia-de-uso.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\investigacion\\2026-09-15-mercado-mexico-evidencia-de-uso.md",
+      "sha256": "cc46fc2e9660d40e238bcbbf548b758c53b3aa67407dc8a15de1b4fa5a17ff0a"
+    },
+    {
+      "destino": "docs/investigacion/2026-09-15-vitrio-nombre-dominios-mercado.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\investigacion\\2026-09-15-vitrio-nombre-dominios-mercado.md",
+      "sha256": "579140ac8fe7e31954dd4a42372425ce7e4b8633705eedd6096581340a93219d"
+    },
+    {
+      "destino": "docs/coordinacion/intercambio/README.md",
+      "origen": "C:\\Users\\adcueto\\OneDrive\\Documents\\ChatGPT\\LUMIN-TV\\coordinacion\\intercambio\\README.md",
+      "sha256": "10c19a41d8603de57aa742131434adadce09d0b4225b73f996dc06ceb6b0d03d"
+    }
+  ]
+}

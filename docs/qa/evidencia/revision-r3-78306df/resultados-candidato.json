@@ -1,0 +1,54 @@
+[
+  {
+    "test": "test_logins_simultaneos_no_pierden_sesiones",
+    "status": "PASS"
+  },
+  {
+    "test": "test_altas_de_usuario_simultaneas_no_se_pisan",
+    "status": "PASS"
+  },
+  {
+    "test": "test_marcas_de_giro_simultaneas_no_se_pierden",
+    "status": "PASS"
+  },
+  {
+    "test": "test_conexiones_simultaneas_no_se_rechazan",
+    "status": "PASS"
+  },
+  {
+    "test": "test_un_404_no_cuenta_como_reproduccion",
+    "status": "PASS"
+  },
+  {
+    "test": "test_una_descarga_real_si_cuenta_una_vez",
+    "status": "PASS"
+  },
+  {
+    "test": "test_dar_de_baja_una_pantalla_no_duplica_numeros",
+    "status": "PASS"
+  },
+  {
+    "test": "test_los_errores_quedan_en_bitacora",
+    "status": "PASS"
+  },
+  {
+    "test": "test_contrato_playlist_intacto",
+    "status": "PASS"
+  },
+  {
+    "test": "test_contrato_turno_intacto",
+    "status": "PASS"
+  },
+  {
+    "test": "test_head_de_medio_real_responde_como_get_sin_contar",
+    "status": "PASS"
+  },
+  {
+    "test": "test_head_de_medio_inexistente_es_404_sin_contar",
+    "status": "PASS"
+  },
+  {
+    "test": "test_head_de_miniatura_y_rapido",
+    "status": "PASS"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "brighterscript": "0.73.5",
+  "archivos": [
+    "roku-app\\source\\main.brs",
+    "roku-app\\components\\cachetask.brs",
+    "roku-app\\components\\cache.brs",
+    "roku-app\\components\\mainscene.brs",
+    "roku-app\\components\\mainscene.xml",
+    "roku-app\\components\\cachetask.xml",
+    "roku-app\\components\\playlisttask.brs",
+    "roku-app\\components\\playlisttask.xml"
+  ],
+  "diagnosticos": [],
+  "node": "v24.18.1"
+}

@@ -1,0 +1,33 @@
+{
+  "sha": "5c96845413f3ce11474d5123ee95fae9a63827d6",
+  "files": {
+    "docs/coordinacion/10-diagnostico-y-plan-modernizacion.md": "4e6649fdf2328eb0019b0e1af3c6d1f4d422bf0a9134fa14bc23af6cdc0a1fc3",
+    "docs/coordinacion/11-entrega-B1-continuidad.md": "ce4a4e1e9ac053edd4f38632598c39f18e27f648af9ee88c31890f24768f53bc",
+    "docs/coordinacion/12-entrega-B2-higiene.md": "d7d0566a02de911be63a68d0ee65d85c4660058c35b7643ffb951b61b303c1d6",
+    "docs/coordinacion/13-diseno-B3-postgresql.md": "e47369be5d77eac49a47a3d192b0c01233c2aa1c1c5d8ca57ed5425390984f7f",
+    "docs/coordinacion/b1-propuesta-visual.png": "3cc2372b2890545312f0bb327d6cc5e6960754cbd852cd547c499bbdc467906f",
+    "roku-app/components/Cache.brs": "9eabe30f0292f0a0a982f1228eebd4cbac54dd23d4061905df184104afade2f6",
+    "roku-app/components/CacheTask.brs": "e35ad7bef066b562752bc4ddcd64c320c3b1a79d4827f015e693e053697505aa",
+    "roku-app/components/CacheTask.xml": "708fe2de2bf9009bf4a57e85208b63485a52b2a6ab3eca08dd9e8afe2347db08",
+    "roku-app/components/MainScene.brs": "041438c1378d8ddaf29ed6d4e752f47151ac2bb5d5352e18e32177824cc1d9f2",
+    "roku-app/components/MainScene.xml": "f643aabadbad4f1924fa6f9ef861a8aaf49977eda9b404cdaeff42a8ef597996",
+    "roku-app/components/PlaylistTask.brs": "dfe26fe350c55e315dfd78091d0b3d500623477814d7d05f3f157a81edd49bca",
+    "roku-app/components/PlaylistTask.xml": "bba971a187fc0b50ce593466d73ab3476532a4c68aabcbdd073caacba9ca05a5",
+    "roku-app/images/mm_icon_focus_hd.png": "c4ae778ac37fc46c693c75c47198d29c73d7498339b5ba1cd98566dfd350d291",
+    "roku-app/images/mm_icon_focus_sd.png": "b2560c7a0cb022e9dc173547dd4bd0522cecc9e2f92d7e33138298e01ce0cf83",
+    "roku-app/images/punto_ambar.png": "2b57163280bb48e81b10e8d1777347b6461f8816c387e37e08721bba963afa7d",
+    "roku-app/images/respaldo_horizontal.png": "40461801fd358969ec20fc55c97bcbddcaf269372de8f4271ad61683b67bfc74",
+    "roku-app/images/respaldo_vertical.png": "7286cb0d3e4292e5ca625b9f173deca567828f072d8efd0a12d84cc7ae682852",
+    "roku-app/images/splash_fhd.png": "579fb582e20111c395cd59568c4b6e73bbed099024e58262b4c7a0feb160766d",
+    "roku-app/images/splash_hd.png": "f4c8061836e686b1941a55383719af5ee222f313ab1d19b5f2c8ef3daef57467",
+    "roku-app/images/splash_sd.png": "03b9b3c03a41d54d6138b39eca9999e912cf4a711a3f561aed85a24831399063",
+    "roku-app/manifest": "62df205ff7f4eac5c49b9fb5c7bc8628246b00991b9a5c5a50dfdea08bde489e",
+    "roku-app/source/main.brs": "65b60260324ae6a0c58a8e9a1c52b503ac2572d8236561ed30b5c9db7cad64d9",
+    "servidor/servidor_lumin.py": "28cf6b613f86d87c5d7ca5d6b73c808051f55673ec667b821406e48a6f777e1a",
+    "servidor/tests/arnes.py": "8bd30af5bb6ee3773fd07005bba3f78933ed103f4689c9165b6a0949d885f63d",
+    "servidor/tests/comparar_con_base.py": "5e49950b719d51f2564324d6dffacfcc02ce71ce1986b2a8a84ba69a3aae8f14",
+    "servidor/tests/conftest.py": "15bb29f51370f3e55cc795c1bf3ea658d865d12ef37d2feb70b0d99f07b84f2e",
+    "servidor/tests/requirements.txt": "e5d9943702bb51c0b13a5891bf396d41a5b0d269f583ad57534e5021a32af50d",
+    "servidor/tests/test_b2_higiene.py": "19f2f05b8cafa3241c630bd3c54551607b0ea59a08f98a58ddb1213754550455"
+  }
+}

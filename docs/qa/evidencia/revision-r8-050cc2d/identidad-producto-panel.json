@@ -1,0 +1,170 @@
+{
+  "docs/diseno-panel/README.md": {
+    "base": "d2556a3da941e7fe5389e5b331859d81d54ca05f4f603edafe2337d2ae6d7438",
+    "candidato": "d2556a3da941e7fe5389e5b331859d81d54ca05f4f603edafe2337d2ae6d7438"
+  },
+  "docs/diseno-panel/capturar.py": {
+    "base": "5a3a1e8fb4041fcdfcc5e1061480e0b0ffa516c0fc7ed044958b7206aa6fa2d3",
+    "candidato": "5a3a1e8fb4041fcdfcc5e1061480e0b0ffa516c0fc7ed044958b7206aa6fa2d3"
+  },
+  "docs/diseno-panel/capturas/escritorio-ajustes.png": {
+    "base": "c7d44cbe320b14f0db81bdb8a2022ea4ba633709a6fdd36e7b842d7ca22c746a",
+    "candidato": "c7d44cbe320b14f0db81bdb8a2022ea4ba633709a6fdd36e7b842d7ca22c746a"
+  },
+  "docs/diseno-panel/capturas/escritorio-biblioteca.png": {
+    "base": "58a0aeeca3d912b18e3c2ef125d78ad37bb492288d3ca65c9a5dadc8406685d0",
+    "candidato": "58a0aeeca3d912b18e3c2ef125d78ad37bb492288d3ca65c9a5dadc8406685d0"
+  },
+  "docs/diseno-panel/capturas/escritorio-inicio.png": {
+    "base": "56b58df6eae91aebe85342f0d6fb349013cf3ded76f55d247c7b08d6e8404bec",
+    "candidato": "56b58df6eae91aebe85342f0d6fb349013cf3ded76f55d247c7b08d6e8404bec"
+  },
+  "docs/diseno-panel/capturas/escritorio-listas.png": {
+    "base": "93bbad9bebd60cff26f2ebdacc89260c7e169f635baa7980a70da360c07a7ee9",
+    "candidato": "93bbad9bebd60cff26f2ebdacc89260c7e169f635baa7980a70da360c07a7ee9"
+  },
+  "docs/diseno-panel/capturas/escritorio-pantallas.png": {
+    "base": "285170d1a7d0f6001da8d915fe60036a34c68c0123d64c6cb394da9f06b6cd7f",
+    "candidato": "285170d1a7d0f6001da8d915fe60036a34c68c0123d64c6cb394da9f06b6cd7f"
+  },
+  "docs/diseno-panel/capturas/movil-inicio.png": {
+    "base": "7ffab7f3ff298cf446b651677819cde1a5ad3129b2536e6b0843c1d8c3b278bc",
+    "candidato": "7ffab7f3ff298cf446b651677819cde1a5ad3129b2536e6b0843c1d8c3b278bc"
+  },
+  "docs/diseno-panel/capturas/movil-mostrar.png": {
+    "base": "58e5fa0b49104e38b216e2e936c7e3e240dbd1874f044e4ba885ce5bba091fc6",
+    "candidato": "58e5fa0b49104e38b216e2e936c7e3e240dbd1874f044e4ba885ce5bba091fc6"
+  },
+  "docs/diseno-panel/capturas/movil-turnos.png": {
+    "base": "fc67f4b97ffd6bddd9c689b49a7be67c4f3f24f37a00b55543435468bc3e7982",
+    "candidato": "fc67f4b97ffd6bddd9c689b49a7be67c4f3f24f37a00b55543435468bc3e7982"
+  },
+  "docs/diseno-panel/comprobar_anchura.py": {
+    "base": "8576466ec0ef0ac57f1385454f2a70601ab8da2859d11a305e2aa3181100bc34",
+    "candidato": "8576466ec0ef0ac57f1385454f2a70601ab8da2859d11a305e2aa3181100bc34"
+  },
+  "docs/diseno-panel/prototipo.html": {
+    "base": "023c28e193b26a15c2dd14c99e7efcbbe72531dbf935d679a620ade92d25e04a",
+    "candidato": "023c28e193b26a15c2dd14c99e7efcbbe72531dbf935d679a620ade92d25e04a"
+  },
+  "docs/reproductor-continuidad.md": {
+    "base": "bdb20dc56ff38b179e014c7af72dbb5e32e0f3dbe28bad8d4b12b3d94386f5b0",
+    "candidato": "bdb20dc56ff38b179e014c7af72dbb5e32e0f3dbe28bad8d4b12b3d94386f5b0"
+  },
+  "roku-app/components/Cache.brs": {
+    "base": "42a16301ad5ef56df612ec033d0d1766881c7882b9ee7f767fd9a4f4b16dc62d",
+    "candidato": "42a16301ad5ef56df612ec033d0d1766881c7882b9ee7f767fd9a4f4b16dc62d"
+  },
+  "roku-app/components/CacheTask.brs": {
+    "base": "d27488323286f3ea1aebfda41168bba24bf153d4d723c7adfb1ec8e109729535",
+    "candidato": "d27488323286f3ea1aebfda41168bba24bf153d4d723c7adfb1ec8e109729535"
+  },
+  "roku-app/components/CacheTask.xml": {
+    "base": "dbb37cb60fd64c58ee3e517040cbf0c377b66c29c3371bb25f76664bea2ac547",
+    "candidato": "dbb37cb60fd64c58ee3e517040cbf0c377b66c29c3371bb25f76664bea2ac547"
+  },
+  "roku-app/components/MainScene.brs": {
+    "base": "c7cdcf9ab231db35aa4e5c53ed3ba458604276df9ff6c6316a5304cc616c10f7",
+    "candidato": "c7cdcf9ab231db35aa4e5c53ed3ba458604276df9ff6c6316a5304cc616c10f7"
+  },
+  "roku-app/components/MainScene.xml": {
+    "base": "2f4eb04b9b1619690e2d15c18b1e923553bd4029ca145d5f69e843bc2a8c0dfb",
+    "candidato": "2f4eb04b9b1619690e2d15c18b1e923553bd4029ca145d5f69e843bc2a8c0dfb"
+  },
+  "roku-app/components/PlaylistTask.brs": {
+    "base": "40056762b57e396272995fd6134bb23e07a3c1e12875adda57f8d21fcb293427",
+    "candidato": "40056762b57e396272995fd6134bb23e07a3c1e12875adda57f8d21fcb293427"
+  },
+  "roku-app/components/PlaylistTask.xml": {
+    "base": "719b555bd5725a4402898ea5800f61f25b6d096b42381966bdf8c028e0d43f6a",
+    "candidato": "719b555bd5725a4402898ea5800f61f25b6d096b42381966bdf8c028e0d43f6a"
+  },
+  "roku-app/images/mm_icon_focus_hd.png": {
+    "base": "c4ae778ac37fc46c693c75c47198d29c73d7498339b5ba1cd98566dfd350d291",
+    "candidato": "c4ae778ac37fc46c693c75c47198d29c73d7498339b5ba1cd98566dfd350d291"
+  },
+  "roku-app/images/mm_icon_focus_sd.png": {
+    "base": "b2560c7a0cb022e9dc173547dd4bd0522cecc9e2f92d7e33138298e01ce0cf83",
+    "candidato": "b2560c7a0cb022e9dc173547dd4bd0522cecc9e2f92d7e33138298e01ce0cf83"
+  },
+  "roku-app/images/punto_ambar.png": {
+    "base": "2b57163280bb48e81b10e8d1777347b6461f8816c387e37e08721bba963afa7d",
+    "candidato": "2b57163280bb48e81b10e8d1777347b6461f8816c387e37e08721bba963afa7d"
+  },
+  "roku-app/images/respaldo_horizontal.png": {
+    "base": "40461801fd358969ec20fc55c97bcbddcaf269372de8f4271ad61683b67bfc74",
+    "candidato": "40461801fd358969ec20fc55c97bcbddcaf269372de8f4271ad61683b67bfc74"
+  },
+  "roku-app/images/respaldo_vertical.png": {
+    "base": "7286cb0d3e4292e5ca625b9f173deca567828f072d8efd0a12d84cc7ae682852",
+    "candidato": "7286cb0d3e4292e5ca625b9f173deca567828f072d8efd0a12d84cc7ae682852"
+  },
+  "roku-app/images/splash_fhd.png": {
+    "base": "579fb582e20111c395cd59568c4b6e73bbed099024e58262b4c7a0feb160766d",
+    "candidato": "579fb582e20111c395cd59568c4b6e73bbed099024e58262b4c7a0feb160766d"
+  },
+  "roku-app/images/splash_hd.png": {
+    "base": "f4c8061836e686b1941a55383719af5ee222f313ab1d19b5f2c8ef3daef57467",
+    "candidato": "f4c8061836e686b1941a55383719af5ee222f313ab1d19b5f2c8ef3daef57467"
+  },
+  "roku-app/images/splash_sd.png": {
+    "base": "03b9b3c03a41d54d6138b39eca9999e912cf4a711a3f561aed85a24831399063",
+    "candidato": "03b9b3c03a41d54d6138b39eca9999e912cf4a711a3f561aed85a24831399063"
+  },
+  "roku-app/manifest": {
+    "base": "43da5170c92c423d7e56e67e837d8a6cd8da0b9f46ddaf970b4ffa4c5fd03528",
+    "candidato": "43da5170c92c423d7e56e67e837d8a6cd8da0b9f46ddaf970b4ffa4c5fd03528"
+  },
+  "roku-app/pruebas/Cache_simulado.brs": {
+    "base": "2f243588688ddea6910a7a429c4ff487b3ea840621dd4af926a0296d3c2baf1c",
+    "candidato": "2f243588688ddea6910a7a429c4ff487b3ea840621dd4af926a0296d3c2baf1c"
+  },
+  "roku-app/pruebas/correr.py": {
+    "base": "fa75660f07c261d6ef9bd5aba507744b2f5ba3b158aa2d05d4057c19e07fba07",
+    "candidato": "fa75660f07c261d6ef9bd5aba507744b2f5ba3b158aa2d05d4057c19e07fba07"
+  },
+  "roku-app/pruebas/escena.brs": {
+    "base": "6d91b7bf4cbe401f27a0539a648e7562eb36992ba7ae30e8eb9c31600fa28b11",
+    "candidato": "6d91b7bf4cbe401f27a0539a648e7562eb36992ba7ae30e8eb9c31600fa28b11"
+  },
+  "roku-app/pruebas/planificacion.brs": {
+    "base": "aa845cd7519a2057f646d5eb867c01127b3e4bf8aa350078af03918635f1efbb",
+    "candidato": "aa845cd7519a2057f646d5eb867c01127b3e4bf8aa350078af03918635f1efbb"
+  },
+  "roku-app/source/main.brs": {
+    "base": "b64622e41f7f44d5f929a87920612eeb352e21803f95d932ddd9bd1b53622b54",
+    "candidato": "b64622e41f7f44d5f929a87920612eeb352e21803f95d932ddd9bd1b53622b54"
+  },
+  "servidor/servidor_lumin.py": {
+    "base": "b1404d326018b75aef613c55d643997b7270dbbcc2bb1496a781f39fc42b83db",
+    "candidato": "b1404d326018b75aef613c55d643997b7270dbbcc2bb1496a781f39fc42b83db"
+  },
+  "servidor/tests/arnes.py": {
+    "base": "ed812b30239da545b44b8b94a60eb0ad18e4a5d4b6e74c90e07ac9d3ddbc42e1",
+    "candidato": "ed812b30239da545b44b8b94a60eb0ad18e4a5d4b6e74c90e07ac9d3ddbc42e1"
+  },
+  "servidor/tests/comparar_con_base.py": {
+    "base": "639b7538d2d6a1f2eb240d97588bf6f5c44abdfac0d8d8672b666e9560ec2880",
+    "candidato": "639b7538d2d6a1f2eb240d97588bf6f5c44abdfac0d8d8672b666e9560ec2880"
+  },
+  "servidor/tests/conftest.py": {
+    "base": "9663b46093e625d830669fc0cf256b9505398c08afc44ea3edec14d90d9307eb",
+    "candidato": "9663b46093e625d830669fc0cf256b9505398c08afc44ea3edec14d90d9307eb"
+  },
+  "servidor/tests/requirements.txt": {
+    "base": "22e1851ae776543e2fbc098082e583415c47a91191fea5a134d67c1f70846eb1",
+    "candidato": "22e1851ae776543e2fbc098082e583415c47a91191fea5a134d67c1f70846eb1"
+  },
+  "servidor/tests/test_b2_higiene.py": {
+    "base": "baba57f85d64be9e6ecb876445b281be4daf7148c9cf69b69629f1aa950adfb3",
+    "candidato": "baba57f85d64be9e6ecb876445b281be4daf7148c9cf69b69629f1aa950adfb3"
+  },
+  "servidor/tests/test_b5a_estado.py": {
+    "base": "faecb4ca7942e06d56880326e6023f1117e52bec3682cd31ef2bc5866904fc9e",
+    "candidato": "faecb4ca7942e06d56880326e6023f1117e52bec3682cd31ef2bc5866904fc9e"
+  },
+  "servidor/tests/test_inventario_decisiones.py": {
+    "base": "621908f5962b120bb653ae7568c3576377540efec57c86255efc7c863ce1d53b",
+    "candidato": "621908f5962b120bb653ae7568c3576377540efec57c86255efc7c863ce1d53b"
+  }
+}

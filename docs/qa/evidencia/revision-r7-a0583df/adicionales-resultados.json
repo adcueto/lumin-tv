@@ -1,0 +1,14 @@
+{
+  "objetivo": "terminada",
+  "otra_base": "terminada",
+  "rf26_constraints": {
+    "grupo_A_admite_tv_B": true,
+    "grupo_A_admite_lista_B": true,
+    "tv_B_admite_lista_A": true,
+    "tv_sin_sucursal_admite_destino": true
+  },
+  "versiones_de_listas_distintas": [
+    1,
+    1
+  ]
+}

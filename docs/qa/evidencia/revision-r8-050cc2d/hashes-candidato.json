@@ -1,0 +1,8 @@
+{
+  ".github/workflows/verificacion.yml": "411b49ba785b7e6b0a8df5982d82244d37c446ba25893695a3f0147d80ce39da",
+  "docs/coordinacion/13-diseno-B3-postgresql.md": "a4b32eb2d858c30194abbf1df1b308ae1c3a04f6831a4f5c50cbc13fe567051d",
+  "docs/coordinacion/22-rf26-destinos-de-lista.md": "ff853741d811ece7dc6f9a1f7f0f68bef3687de8f480ecd5338d7dd0384146f2",
+  "servidor/ensayos_b3/README.md": "9142313bfa1b68f4c69f967d75e92fc74026b6e0e3d29be27fb4f5fbb2012312",
+  "servidor/ensayos_b3/test_ensayo_destinos.py": "f9c7c6fa99154acf9cbbc68f629b42e8c2cdf9ad9e788c9702f4d53f658dac5c",
+  "servidor/ensayos_b3/test_ensayo_sesiones.py": "ee953c757306a35f1eeef928f9c813f5ffc97df335c4f117bae0ea7cd3de6434"
+}

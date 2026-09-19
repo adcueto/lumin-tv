@@ -1,0 +1,13 @@
+{
+  "grupo_lista_otra_sucursal": "rechazado_fk",
+  "pantalla_pendiente": "rechazado_fk",
+  "grupo_empresa_ajena": "rechazado_fk",
+  "movimiento": "rechazado_fk_sin_cascada",
+  "relaciones_conservadas": [
+    1,
+    1
+  ],
+  "confirmacion_empresa_ajena_aceptada": true,
+  "historial_tiene_empresa_id": false,
+  "politica_empresa": "columna_empresa_id_inexistente"
+}

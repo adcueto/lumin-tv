@@ -1,0 +1,6 @@
+{
+  "estado_inicial": "idle",
+  "drenaje_retorno": true,
+  "conexion_nueva_bloqueada": true,
+  "escritura_nueva_en_conexion_preexistente": 1
+}

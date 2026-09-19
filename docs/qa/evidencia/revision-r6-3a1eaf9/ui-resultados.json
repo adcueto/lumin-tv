@@ -1,0 +1,200 @@
+[
+  {
+    "viewport": 360,
+    "seccion": "inicio",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "pantallas",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "mostrar",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "turnos",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "biblioteca",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "listas",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "ajustes",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "programacion",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "mensajes",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "sucursales",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 360,
+    "seccion": "integraciones",
+    "ancho": 360,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "inicio",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "pantallas",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "mostrar",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "turnos",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "biblioteca",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "listas",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "ajustes",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "programacion",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "mensajes",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "sucursales",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 390,
+    "seccion": "integraciones",
+    "ancho": 390,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "inicio",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "pantallas",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "mostrar",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "turnos",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "biblioteca",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "listas",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "ajustes",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "programacion",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "mensajes",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "sucursales",
+    "ancho": 1366,
+    "pasa": true
+  },
+  {
+    "viewport": 1366,
+    "seccion": "integraciones",
+    "ancho": 1366,
+    "pasa": true
+  }
+]
