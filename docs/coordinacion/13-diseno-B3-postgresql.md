@@ -1,9 +1,21 @@
-# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 8)
+# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 9)
 
 Para revisión de Adrián y Codex **antes de escribir código**.
 Fecha: 2026-09-19 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 62)
 
-## Qué cambia en esta revisión 8 (respuesta al informe 25 sobre `050cc2d`)
+## Qué cambia en esta revisión 9 (respuesta al informe 26 sobre `14f0bc5`)
+
+Codex cierra RF26-QA-02, RF26-QA-03 y DOC-R7-01 en el alcance ensayado y
+reproduce tres problemas del contrato de entregas de la rev. 8. Los tres se
+**CONFIRMAN**. Ensayos: de 61 a **67**.
+
+| Hallazgo de Codex | Decisión | Dónde | Ensayo |
+|---|---|---|---|
+| RF26-QA-04 dos peticiones simultáneas de la misma TV calculan el mismo consecutivo (`max(seq)+1`); una falla por clave duplicada | **CONFIRMADO.** El número sale de un **contador en la fila de la pantalla** (`pantalla.entrega_ultima`), y servir una lista es una transacción que empieza con `SELECT … FOR UPDATE` de esa fila: las peticiones de una misma TV se serializan y cada una ve el resultado de la anterior. El contador nunca se reinicia. Detalle que el arnés descubrió: bloquear y leer la entrega vigente deben ser **dos sentencias**, no un `JOIN`; en `READ COMMITTED` la fila bloqueada se relee al despertar pero el `JOIN` conserva la instantánea vieja y no ve la entrega que la otra transacción acaba de confirmar | §3.2b | reproducción con el SQL de la rev. 8 (A abre la transacción, B espera sobre la clave y falla con `UniqueViolation`); con la rev. 9, B espera el bloqueo de la pantalla y obtiene 2 tras el 1 de A; con la **misma** lista en carrera, 1 y 1 y una sola fila |
+| RF26-QA-05 cada consulta crea otra entrega aunque no cambie la playlist; la recepción queda siempre una atrás (2/1, 3/2, 4/3) | **CONFIRMADO.** Servir es **idempotente**: con el bloqueo tomado se lee la entrega vigente y, si ya es `(lista, version)`, se devuelve su número sin crear nada. Solo un cambio de lista o de versión —o volver a una anterior, que es otra asignación— crea la entrega siguiente. Una TV que consulta cada minuto sin novedades sigue "al día" | §3.2b | reproducción con el SQL de la rev. 8 (`[(2,1),(4,3),(6,5)]`); con la rev. 9 cinco consultas seguidas devuelven 1 y la recepción sigue al día; v2 → 2; otra lista → 3; volver → 4 |
+| RF26-QA-06 borrar una lista referenciada falla: `ON DELETE SET NULL` de la llave compuesta `(id, entrega_x)` intenta anular también `id` | **CONFIRMADO.** `ON DELETE SET NULL (entrega_x)` con lista de columnas (PostgreSQL 15+; el proyecto fija 16). Borrar la lista borra su historial y sus entregas, anula los tres punteros de la pantalla y conserva `id` y el contador; la siguiente entrega continúa la numeración, así que un número borrado **nunca se reutiliza**. Regla del servidor: un `en=` que ya no existe es "entrega desconocida" (viola la FK), se ignora, y la TV recibe una entrega nueva en su próxima consulta | §3.2b; `22-…md` §5 | reproducción con la rev. 8 (`NotNullViolation`); con la rev. 9 el borrado entra, la pantalla queda `(id, NULL, NULL, NULL, ultima=1)`, confirmar la 1 falla por FK, la siguiente entrega es la 2 y se confirma |
+
+## Qué cambió en la revisión 8 (respuesta al informe 25 sobre `050cc2d`)
 
 Codex cierra el drenaje acotado a la base (B3-R4-01) y los cruces de sucursal
 (RF26-QA-01). Las tres correcciones que quedan —RF26-QA-02, RF26-QA-03 y
@@ -419,31 +431,44 @@ CREATE TABLE pantalla_entrega (
   FOREIGN KEY (lista_id, version, empresa_id) REFERENCES lista_version(lista_id, version, empresa_id) ON DELETE CASCADE
 );
 ALTER TABLE pantalla
+  ADD COLUMN entrega_ultima bigint NOT NULL DEFAULT 0,   -- contador por pantalla: nunca se reinicia ni reutiliza (rev. 9)
   ADD COLUMN entrega_env  bigint,   -- ultima entrega servida
   ADD COLUMN entrega_rec  bigint,   -- ultima que la TV declaro aplicada en su latido (B5b)
   ADD COLUMN entrega_conf bigint,   -- ultima que la TV confirmo reproduciendo (propuesta 7)
-  ADD FOREIGN KEY (id, entrega_env)  REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL,
-  ADD FOREIGN KEY (id, entrega_rec)  REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL,
-  ADD FOREIGN KEY (id, entrega_conf) REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL;
+  -- SET NULL POR COLUMNA (PostgreSQL 15+): al borrar la entrega se anula el puntero, no el id (rev. 9)
+  ADD FOREIGN KEY (id, entrega_env)  REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL (entrega_env),
+  ADD FOREIGN KEY (id, entrega_rec)  REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL (entrega_rec),
+  ADD FOREIGN KEY (id, entrega_conf) REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL (entrega_conf);
 ```
 
-SQL del servidor, ensayado tal cual:
+SQL del servidor, ensayado tal cual (rev. 9). Servir una lista es **una
+transacción de cuatro sentencias**; el `FOR UPDATE` inicial serializa las
+peticiones de una misma TV y la lectura de la entrega vigente va en una
+sentencia aparte (con un `JOIN` en la misma sentencia del `FOR UPDATE`, la
+segunda petición despierta con la fila releída pero la instantánea vieja del
+`JOIN`, no ve la entrega recién confirmada y crea otra: lo detectó el arnés):
 
 ```sql
--- Servir una lista a una pantalla = crear la entrega y apuntar entrega_env a ella
-WITH n AS (SELECT coalesce(max(seq), 0) + 1 AS seq FROM pantalla_entrega WHERE pantalla_id = :p),
-     e AS (INSERT INTO pantalla_entrega (pantalla_id, seq, empresa_id, lista_id, version)
-           SELECT :p, n.seq, :empresa, :lista, :version FROM n RETURNING seq)
-UPDATE pantalla SET entrega_env = e.seq FROM e WHERE pantalla.id = :p RETURNING e.seq;
--- Confirmar es monotono: una confirmacion atrasada no toca nada (0 filas); una entrega
--- que la pantalla nunca recibio viola la FK. Igual para entrega_rec.
+BEGIN;
+-- 1. bloquear la pantalla (serializa a la misma TV) y leer el contador y la entrega vigente
+SELECT entrega_ultima, entrega_env FROM pantalla WHERE id = :p FOR UPDATE;
+-- 2. si entrega_env no es NULL: ¿la vigente ya es (lista, version)? entonces devolver entrega_env y COMMIT
+SELECT lista_id, version FROM pantalla_entrega WHERE pantalla_id = :p AND seq = :entrega_env;
+-- 3. si cambio algo: siguiente numero, nueva entrega, apuntar
+UPDATE pantalla SET entrega_ultima = entrega_ultima + 1 WHERE id = :p RETURNING entrega_ultima;   -- :seq
+INSERT INTO pantalla_entrega (pantalla_id, seq, empresa_id, lista_id, version) VALUES (:p, :seq, :empresa, :lista, :version);
+UPDATE pantalla SET entrega_env = :seq WHERE id = :p;
+COMMIT;
+-- Confirmar (y declarar en el latido) es monotono: atrasada, duplicada o desordenada = 0 filas;
+-- una entrega que la pantalla nunca recibio, o que se borro con su lista, viola la FK:
+-- "entrega desconocida", el servidor la ignora y la TV recibe una nueva en su proxima consulta.
 UPDATE pantalla SET entrega_conf = :seq
  WHERE id = :p AND (entrega_conf IS NULL OR entrega_conf < :seq);
 -- "Al dia"
 SELECT entrega_conf IS NOT NULL AND entrega_conf = entrega_env FROM pantalla WHERE id = :p;
 ```
 
-Consecuencias que el ensayo comprueba (`test_ensayo_destinos.py`, 10): con el
+Consecuencias que el ensayo comprueba (`test_ensayo_destinos.py`, 16): con el
 DDL de la rev. 6 los tres cruces de sucursal entraban; con el de la rev. 7 y
 posteriores los tres fallan con violación de llave foránea y las relaciones
 correctas entran. **Mover una pantalla de sucursal no limpia nada en cascada**
@@ -460,8 +485,13 @@ la versión o la entrega con empresa cruzada fallan por FK sea cual sea el
 RLS **en el DDL del ensayo** (política estándar por empresa, `GRANT SELECT,
 INSERT` a `lumin_app`: append-only) y se ejercen con el rol real: sin
 contexto, empresa equivocada, consulta directa al historial, confirmación
-cruzada y el positivo del historial antiguo legítimo. Se ensaya con
-`pantalla_e`/`lista_e` mínimas porque el esquema completo de §3 no existe
+cruzada y el positivo del historial antiguo legítimo. Con el SQL de la rev.
+8, dos peticiones simultáneas de la misma TV chocaban por clave duplicada,
+cada consulta sin cambios creaba otra entrega y borrar una lista referenciada
+fallaba; con la rev. 9 se serializan (1 y 2; con la misma lista 1 y 1), cinco
+consultas sin cambios devuelven la misma entrega, y borrar la lista anula
+solo los punteros, conserva el contador y no reutiliza números. Se ensaya
+con `pantalla_e`/`lista_e` mínimas porque el esquema completo de §3 no existe
 todavía.
 
 Resolución de la lista efectiva de una pantalla, **determinista y en este
@@ -1330,7 +1360,7 @@ respaldo sí, adaptado a `pg_dump` (§7.5).
 ## 13. Lo que pido para cerrar la revisión
 
 - Las siete decisiones de §9 (D7 es nueva en esta revisión).
-- Que Codex repita los 61 ensayos de `servidor/ensayos_b3/` en su entorno
+- Que Codex repita los 67 ensayos de `servidor/ensayos_b3/` en su entorno
   (necesitan un PostgreSQL 16 de ensayo y `psycopg` 3; el README dice cómo).
   Son la evidencia de B3-R2-01/02/03; sin repetirlos, cuentan como evidencia
   aportada por Claude.

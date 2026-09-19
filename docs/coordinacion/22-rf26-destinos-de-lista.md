@@ -6,8 +6,10 @@ rev. 4 (2026-09-19) incorpora los problemas 2 y 3 del informe 24 (aislamiento po
 sucursal en el esquema y confirmación por el par lista+versión); rev. 5 (2026-09-19)
 responde al informe 25: la confirmación identifica una **entrega numerada** por
 pantalla (no solo el par), el historial de versiones es por empresa, y mover una
-pantalla exige limpiar sus relaciones (la base no lo hace en cascada). Ensayado en
-`servidor/ensayos_b3/test_ensayo_destinos.py` (10).
+pantalla exige limpiar sus relaciones (la base no lo hace en cascada); rev. 6
+(2026-09-19) responde al informe 26: servir es idempotente y serializado por
+pantalla, y borrar una lista no rompe las pantallas que la reproducían. Ensayado en
+`servidor/ensayos_b3/test_ensayo_destinos.py` (16).
 
 ## 1. Qué pide RF-26
 
@@ -32,7 +34,7 @@ Reglas de cambio de miembros y borrado:
 - Borrar un grupo borra sus destinos (`ON DELETE CASCADE`); las pantallas
   vuelven a lo que les corresponda por la regla de §3. El panel avisa antes:
   "Estas 2 pantallas volverán a la lista al aire".
-- Borrar una lista borra sus destinos; ídem. Borrar una pantalla borra su
+- Borrar una lista borra sus destinos, su historial de versiones y sus entregas; las pantallas que la reproducían quedan sin entrega vigente y reciben una nueva (la lista al aire) en su próxima consulta. Borrar una pantalla borra su
   pertenencia a grupos y sus destinos directos.
 - Mover una pantalla de sucursal **exige** quitarla antes de todos los grupos
   y destinos de la sucursal de origen: la base rechaza el movimiento mientras
@@ -96,12 +98,20 @@ de la primera asignación parecía "al día" en la tercera (informe 25).
 
 | Estado | Qué significa exactamente | Cómo se sabe | Disponible desde |
 |---|---|---|---|
-| **enviada** | El servidor creó la entrega *n* = (L, N) para esa pantalla y la próxima respuesta la llevará | `pantalla_entrega` + `pantalla.entrega_env = n`; la respuesta de `/playlist.json` lleva `entrega`, `lista_id` y `version` | B6 con el servidor actual |
+| **enviada** | La entrega vigente de esa pantalla es *n* = (L, N) y cada respuesta la lleva mientras no cambie nada | `pantalla_entrega` + `pantalla.entrega_env = n`; la respuesta de `/playlist.json` lleva `entrega`, `lista_id` y `version`. **Servir es idempotente** (rev. 6): la TV consulta cada minuto y recibe el mismo *n* hasta que cambie la lista o su versión; solo entonces nace *n+1*. Las peticiones simultáneas de una misma TV se serializan en la fila de la pantalla | B6 con el servidor actual |
 | **recibida** | La TV **declaró** en un latido posterior que tiene aplicada la entrega *n* | La app manda `en=n` en el latido (parámetro nuevo, mismo mecanismo que B5a); el servidor anota `entrega_rec = n` solo si *n* es mayor que el anotado. Que la TV pida la playlist **no** cuenta: solo cuenta que **diga** qué entrega aplicó | B5b (app build siguiente + servidor) |
 | **reproduciendo** | La TV confirmó que está reproduciendo un elemento de la entrega *n* | Confirmación de reproducción (propuesta 7, evento idempotente por elemento, con `en`); `entrega_conf = n`, monótono | Propuesta 7 |
 
-Reglas que el esquema y el SQL imponen (ensayadas, incluido el contraejemplo
-del informe 25 tal cual): una confirmación o un latido **atrasado, duplicado
+Reglas que el esquema y el SQL imponen (ensayadas, incluidos el contraejemplo
+del informe 25 tal cual y las tres reproducciones del informe 26): consultar
+sin cambios **no crea entregas** (la recepción no queda una atrás); dos
+peticiones simultáneas de la misma TV **no chocan** (contador en la fila de la
+pantalla, tomada con `FOR UPDATE`; con la misma lista en carrera, una sola
+entrega); **borrar una lista** borra su historial y sus entregas, deja los
+tres punteros de la pantalla en NULL sin tocar su id ni su contador, y la
+siguiente entrega continúa la numeración (un número borrado nunca se
+reutiliza; si la TV lo devuelve es "entrega desconocida", se ignora, y la TV
+recibe una nueva en su próxima consulta); una confirmación o un latido **atrasado, duplicado
 o desordenado** (número menor o igual que el ya anotado) no toca nada; una
 entrega que esa pantalla nunca recibió se rechaza; al **reconectar**, la TV
 declara en su primer latido la entrega que tiene aplicada y el panel ve la
@@ -120,9 +130,10 @@ se enseña ("recibida 12:41, 6 s después de enviada"); no se promete.
 ## 6. Impacto en el modelo (B3 §3.2b, rev. 8)
 
 Cinco tablas nuevas (`grupo_pantallas`, `grupo_pantalla_miembro`,
-`lista_destino`, `lista_version`, `pantalla_entrega`), `lista.version` y tres
-números de entrega en `pantalla` (`entrega_env`, `entrega_rec`,
-`entrega_conf`, con FK a `pantalla_entrega`). Todas con `empresa_id` y la
+`lista_destino`, `lista_version`, `pantalla_entrega`), `lista.version`, el
+contador `pantalla.entrega_ultima` y tres números de entrega en `pantalla`
+(`entrega_env`, `entrega_rec`, `entrega_conf`, con FK a `pantalla_entrega` y
+`ON DELETE SET NULL` por columna, PostgreSQL 15+). Todas con `empresa_id` y la
 política RLS estándar (por empresa); las llaves foráneas compuestas garantizan
 la empresa y la sucursal **sin depender de RLS**, que no interviene en la
 comprobación de llaves (informe 25, problema 2).

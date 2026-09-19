@@ -25,11 +25,29 @@ Informe 25 (sobre la rev. 7):
     rechaza el movimiento hasta que se borren miembros y destinos. Es lo que
     el ensayo demuestra y lo que el documento debía decir.
 
+Informe 26 (sobre la rev. 8):
+ RF26-QA-04 dos peticiones simultáneas de la misma TV calculaban el mismo
+            consecutivo con `max(seq)+1`; una fallaba por clave duplicada.
+            Rev. 9: contador `entrega_ultima` en la fila de la pantalla,
+            tomada con `FOR UPDATE`: las peticiones de una TV se serializan.
+ RF26-QA-05 cada consulta creaba otra entrega aunque no cambiara nada, y la
+            recepción quedaba siempre una atrás (2/1, 3/2…). Rev. 9: entregar
+            es idempotente: si la entrega vigente ya es (lista, version) se
+            devuelve su número; solo un cambio crea una entrega nueva.
+ RF26-QA-06 borrar una lista referenciada fallaba: `ON DELETE SET NULL` sobre
+            la llave compuesta (id, entrega_x) intentaba anular también `id`.
+            Rev. 9: `ON DELETE SET NULL (entrega_x)` (lista de columnas,
+            PostgreSQL 15+); el contador no se reinicia, así que un número
+            borrado nunca se reutiliza y una TV que lo devuelva recibe
+            "entrega desconocida" y una entrega nueva en su próxima consulta.
+
 Ensayo de esquema con datos sintéticos; no es implementación de B6/B7.
 """
 
 from __future__ import annotations
 
+import threading
+import time
 import uuid
 
 import psycopg
@@ -202,13 +220,64 @@ CREATE POLICY pantalla_entrega_app ON pantalla_entrega FOR ALL TO lumin_app
   USING (empresa_id = lumin.gc('empresa_id')::uuid) WITH CHECK (empresa_id = lumin.gc('empresa_id')::uuid);
 """
 
-# SQL que hara el servidor. Se ensaya tal cual.
-SQL_ENTREGAR = """
+# ---- §3.2b rev. 9 (informe 26): contador por pantalla, SET NULL por columna
+DDL_REV9 = DDL_REV8.replace(
+    "  ADD COLUMN entrega_env  bigint,      -- ultima entrega servida",
+    "  ADD COLUMN entrega_ultima bigint NOT NULL DEFAULT 0,   -- contador: nunca se reinicia ni reutiliza\n"
+    "  ADD COLUMN entrega_env  bigint,      -- ultima entrega servida",
+).replace(
+    "REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL,\n  ADD FOREIGN KEY (id, entrega_rec)",
+    "REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL (entrega_env),\n  ADD FOREIGN KEY (id, entrega_rec)",
+).replace(
+    "REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL,\n  ADD FOREIGN KEY (id, entrega_conf)",
+    "REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL (entrega_rec),\n  ADD FOREIGN KEY (id, entrega_conf)",
+).replace(
+    "REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL;",
+    "REFERENCES pantalla_entrega(pantalla_id, seq) ON DELETE SET NULL (entrega_conf);",
+)
+assert DDL_REV9.count("SET NULL (entrega_") == 3 and "entrega_ultima" in DDL_REV9
+
+# SQL que hacia el servidor en la rev. 8 (se conserva para reproducir RF26-QA-04/05).
+SQL_ENTREGAR_REV8 = """
 WITH n AS (SELECT coalesce(max(seq), 0) + 1 AS seq FROM pantalla_entrega WHERE pantalla_id = %(p)s),
      e AS (INSERT INTO pantalla_entrega (pantalla_id, seq, empresa_id, lista_id, version)
            SELECT %(p)s, n.seq, %(emp)s, %(l)s, %(v)s FROM n RETURNING seq)
 UPDATE pantalla_e SET entrega_env = e.seq FROM e WHERE pantalla_e.id = %(p)s RETURNING e.seq
 """
+# Rev. 9: la transaccion del servidor al servir /playlist.json, tal cual.
+# Dos sentencias, no un JOIN: en READ COMMITTED, si el FOR UPDATE espera a otra
+# transaccion, la fila de la pantalla se relee al despertar pero el JOIN con la
+# entrega se evaluo con la instantanea vieja (la entrega recien confirmada no
+# se ve). El arnes lo detecto: con un solo JOIN, dos peticiones simultaneas de
+# la MISMA lista creaban dos entregas. Bloquear primero; leer despues.
+SQL_BLOQUEAR = "SELECT entrega_ultima, entrega_env FROM pantalla_e WHERE id = %(p)s FOR UPDATE"
+SQL_VIGENTE = "SELECT lista_id, version FROM pantalla_entrega WHERE pantalla_id = %(p)s AND seq = %(seq)s"
+SQL_SIGUIENTE = "UPDATE pantalla_e SET entrega_ultima = entrega_ultima + 1 WHERE id = %(p)s RETURNING entrega_ultima"
+SQL_INSERTAR = "INSERT INTO pantalla_entrega (pantalla_id, seq, empresa_id, lista_id, version) VALUES (%(p)s, %(seq)s, %(emp)s, %(l)s, %(v)s)"
+SQL_APUNTAR = "UPDATE pantalla_e SET entrega_env = %(seq)s WHERE id = %(p)s"
+
+
+def entregar(c, tv, lista, version=1, empresa=EMPRESA_A, tras_bloquear=None):
+    """Servir (lista, version) a una pantalla. Idempotente: si la entrega
+    vigente ya es ese par, devuelve su numero sin crear nada (RF26-QA-05). El
+    FOR UPDATE de la fila de la pantalla serializa peticiones simultaneas de la
+    misma TV (RF26-QA-04). `tras_bloquear` es una costura del arnes para
+    detener la transaccion con el bloqueo tomado."""
+    with c.transaction():
+        fila = c.execute(SQL_BLOQUEAR, {"p": tv}).fetchone()
+        if fila is None:
+            raise LookupError("pantalla no visible")
+        if tras_bloquear:
+            tras_bloquear()
+        _ultima, env = fila
+        if env is not None and c.execute(SQL_VIGENTE, {"p": tv, "seq": env}).fetchone() == (lista, version):
+            return env
+        seq = c.execute(SQL_SIGUIENTE, {"p": tv}).fetchone()[0]
+        c.execute(SQL_INSERTAR, {"p": tv, "seq": seq, "emp": empresa, "l": lista, "v": version})
+        c.execute(SQL_APUNTAR, {"p": tv, "seq": seq})
+        return seq
+
+
 # Confirmar es monotono: una confirmacion mas vieja que la registrada no toca nada (0 filas).
 SQL_CONFIRMAR = """
 UPDATE pantalla_e SET entrega_conf = %(seq)s
@@ -369,10 +438,10 @@ def test_rev8_entregas_numeradas_distinguen_asignaciones_sucesivas(base):
     aplique llega una confirmacion ATRASADA de la primera L1/v1. Con entregas
     numeradas no aparece 'al dia'. Ademas: duplicados, desordenados,
     inexistentes, reconexion y numeracion independiente por pantalla."""
-    montar(DDL_REV8)
+    montar(DDL_REV9)
     with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
-        def entregar(lista, tv=TV_PLAZA):
-            return c.execute(SQL_ENTREGAR, {"p": tv, "emp": EMPRESA_A, "l": lista, "v": 1}).fetchone()[0]
+        def entregar_(lista, tv=TV_PLAZA):
+            return entregar(c, tv, lista)
         def confirmar(seq, tv=TV_PLAZA):
             return c.execute(SQL_CONFIRMAR, {"p": tv, "seq": seq}).rowcount
         def declarar(seq, tv=TV_PLAZA):                                            # latido: en=<seq> (B5b)
@@ -381,12 +450,12 @@ def test_rev8_entregas_numeradas_distinguen_asignaciones_sucesivas(base):
         def al_dia(tv=TV_PLAZA):
             return c.execute(SQL_AL_DIA, (tv,)).fetchone()[0]
 
-        assert entregar(LISTA_PLAZA) == 1                                          # L1/v1
+        assert entregar_(LISTA_PLAZA) == 1                                          # L1/v1
         assert confirmar(1) == 1 and al_dia() is True
-        assert entregar(LISTA_JURI) == 2                                           # L2/v1
+        assert entregar_(LISTA_JURI) == 2                                           # L2/v1
         assert al_dia() is False
         assert confirmar(2) == 1 and al_dia() is True                              # la TV reproduce L2
-        assert entregar(LISTA_PLAZA) == 3                                          # L1/v1 otra vez: OTRA entrega
+        assert entregar_(LISTA_PLAZA) == 3                                          # L1/v1 otra vez: OTRA entrega
         assert al_dia() is False
         assert confirmar(1) == 0, "confirmacion atrasada de la primera L1/v1: ignorada"
         assert al_dia() is False, "sigue reproduciendo L2; no aparece al dia"
@@ -396,7 +465,7 @@ def test_rev8_entregas_numeradas_distinguen_asignaciones_sucesivas(base):
         assert confirmar(3) == 1 and al_dia() is True                              # ahora si
         assert confirmar(3) == 0 and confirmar(2) == 0 and al_dia() is True        # duplicado y desordenado: nada
         # reconexion: la TV reinicia y en su primer latido dice que entrega tiene aplicada
-        assert entregar(LISTA_JURI) == 4                                           # mientras estaba apagada
+        assert entregar_(LISTA_JURI) == 4                                           # mientras estaba apagada
         assert declarar(3) == 1                                                    # vuelve con la 3 aplicada
         env, rec, conf = c.execute("SELECT entrega_env, entrega_rec, entrega_conf FROM pantalla_e WHERE id = %s", (TV_PLAZA,)).fetchone()
         assert (env, rec, conf) == (4, 3, 3)                                       # el panel ve: enviada 4, recibida 3
@@ -406,7 +475,7 @@ def test_rev8_entregas_numeradas_distinguen_asignaciones_sucesivas(base):
         assert c.execute("SELECT e.lista_id, e.version FROM pantalla_entrega e JOIN pantalla_e p ON p.entrega_conf = e.seq AND p.id = e.pantalla_id WHERE p.id = %s",
                          (TV_PLAZA,)).fetchone() == (LISTA_JURI, 1)
         # la otra pantalla numera por su cuenta
-        assert entregar(LISTA_JURI, TV_JURI) == 1
+        assert entregar_(LISTA_JURI, TV_JURI) == 1
         assert al_dia() is True and al_dia(TV_JURI) is False
 
 
@@ -421,7 +490,7 @@ def test_reproduccion_rev7_confirma_version_de_otra_empresa(base):
 
 
 def test_rev8_historial_y_entregas_por_empresa(base):
-    montar(DDL_REV8)
+    montar(DDL_REV9)
     with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
         # una version no puede declararse con la empresa equivocada
         with pytest.raises(errors.ForeignKeyViolation):
@@ -429,10 +498,11 @@ def test_rev8_historial_y_entregas_por_empresa(base):
         # una entrega a una pantalla de A con una lista de B: rechazada, diga lo que diga empresa_id
         for emp in (EMPRESA_A, EMPRESA_B):
             with pytest.raises(errors.ForeignKeyViolation):
-                c.execute(SQL_ENTREGAR, {"p": TV_PLAZA, "emp": emp, "l": LISTA_B, "v": 1})
+                entregar(c, TV_PLAZA, LISTA_B, empresa=emp)
         assert c.execute("SELECT count(*) FROM pantalla_entrega").fetchone()[0] == 0
+        assert c.execute("SELECT entrega_ultima FROM pantalla_e WHERE id = %s", (TV_PLAZA,)).fetchone()[0] == 0   # el fallo revirtio el contador
         # la de la propia empresa entra
-        assert c.execute(SQL_ENTREGAR, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_PLAZA, "v": 1}).fetchone()[0] == 1
+        assert entregar(c, TV_PLAZA, LISTA_PLAZA) == 1
 
 
 def test_rev8_historial_y_entregas_como_lumin_app(base):
@@ -441,7 +511,7 @@ def test_rev8_historial_y_entregas_como_lumin_app(base):
     el (ni mintiendo el empresa_id: entonces falla la FK); una entrega cruzada
     no entra por ningun camino; el historial antiguo propio sigue legible y las
     entregas propias funcionan."""
-    montar(DDL_REV8)
+    montar(DDL_REV9)
     with psycopg.connect(dsn_rol("lumin_app")) as c:
         cur = c.cursor()
         # sin contexto
@@ -463,26 +533,29 @@ def test_rev8_historial_y_entregas_como_lumin_app(base):
         c.rollback(); contexto(cur, empresa=EMPRESA_A)
         # entrega cruzada: lista de B a pantalla de A, por los dos caminos
         with pytest.raises(errors.ForeignKeyViolation):
-            cur.execute(SQL_ENTREGAR, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_B, "v": 1})
+            entregar(c, TV_PLAZA, LISTA_B, empresa=EMPRESA_A)
         c.rollback(); contexto(cur, empresa=EMPRESA_A)
         with pytest.raises(errors.InsufficientPrivilege):
-            cur.execute(SQL_ENTREGAR, {"p": TV_PLAZA, "emp": EMPRESA_B, "l": LISTA_B, "v": 1})
+            entregar(c, TV_PLAZA, LISTA_B, empresa=EMPRESA_B)
         c.rollback(); contexto(cur, empresa=EMPRESA_A)
         # confirmacion cruzada: una pantalla de B no existe para A (0 filas), aunque exista la entrega
         c.commit()
     with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as adm:
         adm.execute("INSERT INTO pantalla_e (id, empresa_id, sucursal_id) VALUES (%s, %s, %s)", (TV_B := uuid.uuid4(), EMPRESA_B, SUC_B))
-        adm.execute(SQL_ENTREGAR, {"p": TV_B, "emp": EMPRESA_B, "l": LISTA_B, "v": 1})
+        entregar(adm, TV_B, LISTA_B, empresa=EMPRESA_B)
     with psycopg.connect(dsn_rol("lumin_app")) as c:
         cur = c.cursor()
         contexto(cur, empresa=EMPRESA_A)
         assert cur.execute(SQL_CONFIRMAR, {"p": TV_B, "seq": 1}).rowcount == 0
+        with pytest.raises(LookupError):                                           # ni siquiera puede servirle
+            entregar(c, TV_B, LISTA_B, empresa=EMPRESA_B)
+        contexto(cur, empresa=EMPRESA_A)
         # positivo: la lista propia avanza; el historial antiguo sigue legible y referenciado
-        assert cur.execute(SQL_ENTREGAR, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_PLAZA, "v": 1}).fetchone()[0] == 1
+        assert entregar(c, TV_PLAZA, LISTA_PLAZA) == 1
         assert cur.execute(SQL_CONFIRMAR, {"p": TV_PLAZA, "seq": 1}).rowcount == 1
         cur.execute("INSERT INTO lista_version (lista_id, version, empresa_id) VALUES (%s, 2, %s)", (LISTA_PLAZA, EMPRESA_A))
         cur.execute("UPDATE lista_e SET version = 2 WHERE id = %s", (LISTA_PLAZA,))
-        assert cur.execute(SQL_ENTREGAR, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_PLAZA, "v": 2}).fetchone()[0] == 2
+        assert entregar(c, TV_PLAZA, LISTA_PLAZA, version=2) == 2
         assert cur.execute("SELECT version FROM lista_version WHERE lista_id = %s ORDER BY version", (LISTA_PLAZA,)).fetchall() == [(1,), (2,)]
         assert cur.execute("SELECT e.version FROM pantalla_entrega e JOIN pantalla_e p ON p.entrega_conf = e.seq AND p.id = e.pantalla_id WHERE p.id = %s",
                            (TV_PLAZA,)).fetchone() == (1,)                          # reproduciendo v1, enviada v2
@@ -493,7 +566,7 @@ def test_mover_pantalla_es_una_transaccion_que_revierte_entera(base):
     """DOC-R7-01: 'mover' = borrar membresias y destinos + UPDATE, en una sola
     transaccion. Si el movimiento falla a medias (aqui: sucursal de otra
     empresa), NADA se borra."""
-    montar(DDL_REV8)
+    montar(DDL_REV9)
     with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
         c.execute("INSERT INTO grupo_pantalla_miembro (grupo_id, pantalla_id, sucursal_id, empresa_id) VALUES (%s, %s, %s, %s)",
                   (GRUPO_PLAZA, TV_PLAZA, PLAZA, EMPRESA_A))
@@ -507,3 +580,133 @@ def test_mover_pantalla_es_una_transaccion_que_revierte_entera(base):
         cuenta = c.execute("SELECT (SELECT count(*) FROM grupo_pantalla_miembro WHERE pantalla_id = %s), (SELECT count(*) FROM lista_destino WHERE pantalla_id = %s), (SELECT sucursal_id FROM pantalla_e WHERE id = %s)",
                            (TV_PLAZA, TV_PLAZA, TV_PLAZA)).fetchone()
         assert cuenta == (1, 1, PLAZA), "rollback entero: relaciones y sucursal intactas"
+
+
+def _en_hilo(fn):
+    caja = {}
+    def cuerpo():
+        try:
+            caja["r"] = fn()
+        except Exception as e:                       # noqa: BLE001 - el ensayo inspecciona la excepcion
+            caja["e"] = e
+    h = threading.Thread(target=cuerpo); h.start()
+    caja["h"] = h
+    return caja
+
+
+def test_reproduccion_rev8_dos_peticiones_simultaneas_chocan(base):
+    """RF26-QA-04 con el SQL de la rev. 8: dos transacciones leen max(seq)=0,
+    ambas calculan 1; la segunda espera a la primera y falla por clave duplicada."""
+    montar(DDL_REV8)
+    a = psycopg.connect(dsn_rol("lumin_migracion"))                # sin autocommit: la transaccion queda abierta
+    b = psycopg.connect(dsn_rol("lumin_migracion"))
+    try:
+        assert a.execute(SQL_ENTREGAR_REV8, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_PLAZA, "v": 1}).fetchone()[0] == 1
+        caja = _en_hilo(lambda: b.execute(SQL_ENTREGAR_REV8, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_JURI, "v": 1}).fetchone()[0])
+        time.sleep(0.3)
+        assert caja["h"].is_alive(), "B espera a A sobre la clave (1)"
+        a.commit()
+        caja["h"].join(5)
+        assert isinstance(caja.get("e"), errors.UniqueViolation), "el defecto del informe 26"
+    finally:
+        b.rollback(); a.close(); b.close()
+
+
+def test_rev9_peticiones_simultaneas_se_serializan_y_no_duplican(base):
+    """RF26-QA-04: el FOR UPDATE de la fila de la pantalla serializa. Con
+    listas distintas: 1 y 2, sin choque. Con la MISMA lista: 1 y 1, una sola
+    fila (idempotencia bajo carrera, RF26-QA-05)."""
+    montar(DDL_REV9)
+    a = psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True)
+    b = psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True)
+    try:
+        suelta = threading.Event()
+        ca = _en_hilo(lambda: entregar(a, TV_PLAZA, LISTA_PLAZA, tras_bloquear=lambda: suelta.wait(5)))
+        time.sleep(0.2)                                                            # A tiene el bloqueo
+        cb = _en_hilo(lambda: entregar(b, TV_PLAZA, LISTA_JURI))
+        time.sleep(0.3)
+        assert cb["h"].is_alive(), "B espera el bloqueo de la pantalla"
+        suelta.set(); ca["h"].join(5); cb["h"].join(5)
+        assert (ca.get("r"), cb.get("r")) == (1, 2), (ca, cb)
+        # misma lista en carrera: la segunda ve la entrega vigente y no crea otra
+        suelta = threading.Event()
+        ca = _en_hilo(lambda: entregar(a, TV_JURI, LISTA_JURI, tras_bloquear=lambda: suelta.wait(5)))
+        time.sleep(0.2)
+        cb = _en_hilo(lambda: entregar(b, TV_JURI, LISTA_JURI))
+        time.sleep(0.2)
+        suelta.set(); ca["h"].join(5); cb["h"].join(5)
+        assert (ca.get("r"), cb.get("r")) == (1, 1), (ca, cb)
+        assert a.execute("SELECT count(*) FROM pantalla_entrega WHERE pantalla_id = %s", (TV_JURI,)).fetchone()[0] == 1
+    finally:
+        a.close(); b.close()
+
+
+def test_reproduccion_rev8_cada_consulta_crea_otra_entrega(base):
+    """RF26-QA-05 con el SQL de la rev. 8: la TV consulta cada minuto sin que
+    cambie nada; la recepcion queda siempre una atras (2/1, 3/2, 4/3)."""
+    montar(DDL_REV8)
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        atras = []
+        for _ in range(3):
+            seq = c.execute(SQL_ENTREGAR_REV8, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_PLAZA, "v": 1}).fetchone()[0]
+            c.execute("UPDATE pantalla_e SET entrega_rec = %s WHERE id = %s", (seq, TV_PLAZA))       # la TV la aplica...
+            seq2 = c.execute(SQL_ENTREGAR_REV8, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_PLAZA, "v": 1}).fetchone()[0]  # ...y vuelve a consultar
+            atras.append((seq2, seq))
+        assert atras == [(2, 1), (4, 3), (6, 5)], "el defecto: nunca al dia"
+
+
+def test_rev9_consultar_sin_cambios_no_crea_entregas(base):
+    """RF26-QA-05: entregar es idempotente mientras (lista, version) no cambie;
+    la TV que consulta cada minuto sigue al dia. Cambiar la version o la lista
+    crea la entrega siguiente; volver atras tambien (es otra asignacion)."""
+    montar(DDL_REV9)
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        def declarar(seq):
+            return c.execute("UPDATE pantalla_e SET entrega_rec = %(seq)s WHERE id = %(p)s AND (entrega_rec IS NULL OR entrega_rec < %(seq)s)",
+                             {"p": TV_PLAZA, "seq": seq}).rowcount
+        def recibida_al_dia():
+            return c.execute("SELECT entrega_rec IS NOT NULL AND entrega_rec = entrega_env FROM pantalla_e WHERE id = %s", (TV_PLAZA,)).fetchone()[0]
+        assert entregar(c, TV_PLAZA, LISTA_PLAZA) == 1
+        assert declarar(1) == 1 and recibida_al_dia() is True
+        for _ in range(5):                                                         # cinco consultas mas: nada cambia
+            assert entregar(c, TV_PLAZA, LISTA_PLAZA) == 1
+            assert declarar(1) == 0 and recibida_al_dia() is True
+        assert c.execute("SELECT count(*) FROM pantalla_entrega").fetchone()[0] == 1
+        # la lista avanza a v2: entrega nueva, la TV queda atras hasta aplicarla
+        c.execute("INSERT INTO lista_version (lista_id, version, empresa_id) VALUES (%s, 2, %s)", (LISTA_PLAZA, EMPRESA_A))
+        assert entregar(c, TV_PLAZA, LISTA_PLAZA, version=2) == 2 and recibida_al_dia() is False
+        assert declarar(2) == 1 and recibida_al_dia() is True
+        assert entregar(c, TV_PLAZA, LISTA_JURI) == 3                              # otra lista
+        assert entregar(c, TV_PLAZA, LISTA_PLAZA, version=2) == 4                  # volver: otra asignacion
+
+
+def test_reproduccion_rev8_borrar_lista_referenciada_falla(base):
+    """RF26-QA-06 con el DDL de la rev. 8: el SET NULL de la llave compuesta
+    (id, entrega_env) intenta anular tambien id."""
+    montar(DDL_REV8)
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        c.execute(SQL_ENTREGAR_REV8, {"p": TV_PLAZA, "emp": EMPRESA_A, "l": LISTA_PLAZA, "v": 1})
+        with pytest.raises(errors.NotNullViolation):
+            c.execute("DELETE FROM lista_e WHERE id = %s", (LISTA_PLAZA,))
+
+
+def test_rev9_borrar_lista_anula_solo_las_entregas_y_no_reutiliza_numeros(base):
+    """RF26-QA-06: con SET NULL por columna la lista se borra, la pantalla
+    conserva su id y su contador; la siguiente entrega continua la numeracion,
+    y una TV que devuelva el numero borrado recibe 'entrega desconocida'."""
+    montar(DDL_REV9)
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        assert entregar(c, TV_PLAZA, LISTA_PLAZA) == 1
+        c.execute(SQL_CONFIRMAR, {"p": TV_PLAZA, "seq": 1})
+        c.execute("UPDATE pantalla_e SET entrega_rec = 1 WHERE id = %s", (TV_PLAZA,))
+        c.execute("DELETE FROM lista_e WHERE id = %s", (LISTA_PLAZA,))            # ahora si
+        assert c.execute("SELECT id, entrega_env, entrega_rec, entrega_conf, entrega_ultima FROM pantalla_e WHERE id = %s",
+                         (TV_PLAZA,)).fetchone() == (TV_PLAZA, None, None, None, 1)
+        assert c.execute("SELECT count(*) FROM pantalla_entrega").fetchone()[0] == 0
+        # la TV sigue devolviendo la 1: entrega desconocida (FK). El servidor la ignora;
+        # en su proxima consulta recibe la entrega 2, nunca otra vez la 1.
+        with pytest.raises(errors.ForeignKeyViolation):
+            c.execute(SQL_CONFIRMAR, {"p": TV_PLAZA, "seq": 1})
+        assert entregar(c, TV_PLAZA, LISTA_JURI) == 2
+        assert c.execute(SQL_CONFIRMAR, {"p": TV_PLAZA, "seq": 2}).rowcount == 1
+        assert c.execute(SQL_AL_DIA, (TV_PLAZA,)).fetchone()[0] is True
