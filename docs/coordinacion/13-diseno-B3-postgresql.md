@@ -1,9 +1,19 @@
-# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 4)
+# Diseño de B3 — PostgreSQL y modelo multiempresa (revisión 5)
 
 Para revisión de Adrián y Codex **antes de escribir código**.
 Fecha: 2026-09-17 · Autor: Claude · Base: `modernizacion-diagnostico` (servidor 6.10, app 5.2 build 60)
 
-## Qué cambia en esta revisión 4 (respuesta a `19-qa-B1-R4-B3-rev3-ce4716f.md`)
+## Qué cambia en esta revisión 5 (respuesta a `22-qa-B3-rev4-B5a-1f7782e.md`)
+
+Las dos correcciones de B3 se **CONFIRMAN**. Ensayos: de 39 a **46**, con la
+reproducción de cada defecto con el protocolo anterior.
+
+| Corrección de Codex | Decisión | Dónde | Ensayo |
+|---|---|---|---|
+| B3-R4-01 [P1] el drenaje cancelaba consultas y retornaba; una transacción `idle in transaction` seguía viva y confirmaba después | **CONFIRMADO.** Contrato nuevo en cuatro pasos: (1) cerrar la entrada con `REVOKE CONNECT ON DATABASE … FROM lumin_app` (la base ya no da `CONNECT` a `PUBLIC`); (2) esperar hasta el plazo a que **ninguna** conexión de `lumin_app` tenga transacción capaz de confirmar (activa, `idle in transaction` o con `backend_xid`); (3) al vencer, **`pg_terminate_backend`** (termina con rollback; cancelar no bastaba); (4) volver a comprobar; si aún queda una, `DrenajeIncompleto` y la reversión se **bloquea**, incluida la de emergencia | §7.3, §7.6 | `test_ensayo_sesiones.py`: reproducción (cancelar no impide el commit tardío), termina `idle in transaction` y el commit falla, termina una consulta activa, cierra la entrada a nuevos escritores, deja confirmar a quien llega a tiempo, `revertir` no escribe con drenaje incompleto |
+| B3-R4-02 [P1] reintentar una publicación ya confirmada con la misma posesión devolvía "0 filas" y el contrato ordenaba borrar el artefacto publicado | **CONFIRMADO.** `publicar` devuelve tres resultados: `publicado`, `ya_publicado` (fila `hecho` con **mi** posesión y **mi** ruta: éxito idempotente, el archivo se conserva) y `perdido` (otra posesión ganó o el trabajo fue cancelado/reabierto). Solo `perdido` descarta, y solo lo que lleva la posesión propia. Un artefacto referenciado por `resultado` nunca se borra | §8b | `test_ensayo_cola.py`: reproducción del defecto con el UPDATE crudo, reintento idempotente tras respuesta perdida, reintento tras perder la posesión sigue descartando lo propio, cancelación |
+
+## Qué cambió en la revisión 4 (respuesta a `19-qa-B1-R4-B3-rev3-ce4716f.md`)
 
 Las cuatro correcciones se **CONFIRMAN**. Los ensayos de `servidor/ensayos_b3/`
 pasan de 21 a **39**; cada corrección tiene el suyo, incluida la reproducción
@@ -729,11 +739,21 @@ T+30 días Se archivan los JSON congelados (no se borran).
 
 Si algo falla en los pasos 3–5, la reversión es inmediata **pero pasa por el
 mismo guardián** que cualquier otra (rev. 4, B3-R3-02): `revertir.py` pone solo
-lectura, **drena** las transacciones de `lumin_app` en vuelo (espera hasta 30 s
-y después las cancela con `pg_cancel_backend`, para lo que `lumin_migracion` es
-miembro de `pg_signal_backend` y `pg_read_all_stats`), espera a que el espejo
+lectura, **drena** `lumin_app` con el contrato de la rev. 5 (B3-R4-01):
+(1) `REVOKE CONNECT ON DATABASE lumin FROM lumin_app` —la base no concede
+`CONNECT` a `PUBLIC`, solo a los tres roles—, de modo que no entra ningún
+escritor nuevo; (2) espera hasta 30 s a que ninguna conexión de `lumin_app`
+tenga una transacción capaz de confirmar (`state = 'active'`, `idle in
+transaction` o `backend_xid` no nulo); (3) al vencer el plazo, **termina**
+esas conexiones con `pg_terminate_backend` (`lumin_migracion` es miembro de
+`pg_signal_backend` y `pg_read_all_stats`): una sesión terminada hace
+rollback, nunca commit; cancelar la consulta no servía porque `idle in
+transaction` no tiene consulta que cancelar; (4) vuelve a comprobar y, si
+aún queda una transacción viva, declara **drenaje incompleto** y la reversión
+se bloquea —también la de emergencia—. Solo después espera a que el espejo
 deje cero marcas pendientes, verifica §7.4-8 y regenera `sesiones.json` con
-el estado final (§7.6); solo entonces arranca 6.10. Los JSON que **nadie
+el estado final (§7.6); entonces arranca 6.10. La entrada se reabre con
+`GRANT CONNECT` solo al abortar la reversión y volver a 6.11. Los JSON que **nadie
 escribió** desde el paso 1 salvo el humo hacen que esa verificación sea
 trivial, pero no se omite. No existe una ruta de reversión que se salte el
 guardián.
@@ -951,9 +971,14 @@ Protocolo, escrito ahora para que B5 no lo improvise:
   posesión es idempotente. **Después**, una sola transacción hace `UPDATE
   trabajo SET estado='hecho', terminado_en=now(), resultado=<ruta> WHERE id=$1
   AND posesion=$2 AND estado='en_curso'` (y, en la misma transacción, apunta
-  `contenido.ruta_almacen` a esa ruta). Si afecta 0 filas, el trabajador borra
-  **solo el archivo que lleva su posesión en el nombre**: no puede tocar el de
-  la posesión ganadora. El "nombre visible" (`<nombre>.mp4` de la URL heredada)
+  `contenido.ruta_almacen` a esa ruta). Si afecta 0 filas, **en la misma
+  transacción** se lee la fila y se distingue (rev. 5, B3-R4-02): si está
+  `hecho` con **mi** posesión y **mi** ruta, es `ya_publicado` —éxito
+  idempotente, el caso del reintento tras una confirmación cuya respuesta se
+  perdió— y **no se borra nada**; en cualquier otro caso es `perdido` y el
+  trabajador borra **solo el archivo que lleva su posesión en el nombre**: no
+  puede tocar el de la posesión ganadora ni un artefacto referenciado por
+  `resultado`. El "nombre visible" (`<nombre>.mp4` de la URL heredada)
   no se renombra: la URL lo resuelve por `ruta_almacen`. **Huérfanos** (crash
   entre disco y `UPDATE`): un barrido borra los artefactos que ninguna fila
   referencia **y** cuya posesión ya no está `en_curso`; mientras la posesión
@@ -1115,7 +1140,7 @@ respaldo sí, adaptado a `pg_dump` (§7.5).
 ## 13. Lo que pido para cerrar la revisión
 
 - Las siete decisiones de §9 (D7 es nueva en esta revisión).
-- Que Codex repita los 39 ensayos de `servidor/ensayos_b3/` en su entorno
+- Que Codex repita los 46 ensayos de `servidor/ensayos_b3/` en su entorno
   (necesitan un PostgreSQL 16 de ensayo y `psycopg` 3; el README dice cómo).
   Son la evidencia de B3-R2-01/02/03; sin repetirlos, cuentan como evidencia
   aportada por Claude.

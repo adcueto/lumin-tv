@@ -94,3 +94,57 @@ def test_contrato_playlist_igual_con_o_sin_estado():
         _, con, _, _ = latido(s, "TV-D", v="5.2.61", r="uno.mp4", c="3")
         assert sin == con
         assert set(con) >= {"videos", "mensaje", "cintillo", "velocidad", "comando"}
+
+
+# ---------------------------------------------------------------- B5A-QA-01
+
+SUC = "plaza-de-la-mujer"
+
+
+def _operador(s, admin, nombre="karla", sucursales=(SUC,)):
+    st, _, _, _ = s.post("/api/usuarios", {"usuario": nombre, "contrasena": "clave-1234",
+                                           "rol": "usuario", "sucursales": list(sucursales)}, cookie=admin)
+    assert st == 200, st
+    return s.login(nombre, "clave-1234")
+
+
+def test_operador_no_puede_recargar_ni_vaciar_cache():
+    """B5A-QA-01: el permiso se aplica en el servidor, no en el boton."""
+    with Servidor() as s:
+        latido(s, "TV-OP")
+        admin = aprobar(s, "TV-OP")
+        op = _operador(s, admin)
+        _, antes, _, _ = latido(s, "TV-OP")
+        n0 = antes["comando"]["n"]
+        for accion in ("recargar", "vaciar_cache"):
+            st, cuerpo, _, _ = s.post("/api/tv/comando", {"id": "TV-OP", "accion": accion}, cookie=op)
+            assert st == 403, (accion, st, cuerpo)
+        # nada se encolo
+        _, despues, _, _ = latido(s, "TV-OP")
+        assert despues["comando"]["n"] == n0
+        assert (s.json("comandos.json") or {}).get("TV-OP", {}).get("accion") not in ("recargar", "vaciar_cache")
+        # el operador SI conserva los comandos de siempre en su sucursal
+        st, _, _, _ = s.post("/api/tv/comando", {"id": "TV-OP", "accion": "pausa"}, cookie=op)
+        assert st == 200
+        # y el admin si puede
+        st, _, _, _ = s.post("/api/tv/comando", {"id": "TV-OP", "accion": "recargar"}, cookie=admin)
+        assert st == 200
+        _, p, _, _ = latido(s, "TV-OP")
+        assert p["comando"]["accion"] == "recargar"
+
+
+def test_operador_de_otra_sucursal_sigue_sin_poder_mandar_comandos():
+    with Servidor() as s:
+        latido(s, "TV-OTRA")
+        admin = aprobar(s, "TV-OTRA")
+        s.post("/api/sucursales", {"clave": "juriquilla", "nombre": "Juriquilla"}, cookie=admin)
+        op = _operador(s, admin, "beto", ("juriquilla",))
+        # hoy el servidor responde 200 e ignora en silencio la pantalla ajena
+        # (contrato 6.x, se endurece en B4); lo que importa: NADA se encola
+        st, _, _, _ = s.post("/api/tv/comando", {"id": "TV-OTRA", "accion": "pausa", "sucursal": SUC}, cookie=op)
+        assert st == 200
+        st, _, _, _ = s.post("/api/tv/comando", {"id": "TV-OTRA", "accion": "recargar", "sucursal": SUC}, cookie=op)
+        assert st == 403
+        _, p, _, _ = latido(s, "TV-OTRA")
+        assert p["comando"]["n"] == 0
+        assert "TV-OTRA" not in (s.json("comandos.json") or {})

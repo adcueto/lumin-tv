@@ -504,6 +504,11 @@ ESTADO_TV_CAMPOS = {
 }
 
 
+# Comandos que solo el administrador puede emitir (B5a). Se comprueba en la
+# ruta, antes de encolar nada.
+ACCIONES_SOLO_ADMIN = ("recargar", "vaciar_cache")
+
+
 def estado_tv_de(params):
     """Extrae el estado reportado por la TV de los parametros del latido.
     Devuelve {} si no trae ninguno (app anterior)."""
@@ -1582,6 +1587,11 @@ class Manejador(BaseHTTPRequestHandler):
             if accion not in ("pausa", "continuar", "reproducir", "silencio", "sonido",
                               "recargar", "vaciar_cache"):
                 self._responder(400, '{"error":"accion invalida"}')
+                return
+            # B5A-QA-01: los comandos de operacion remota son SOLO de administrador.
+            # El permiso se aplica aqui, en el servidor; ocultar el boton no cuenta.
+            if accion in ACCIONES_SOLO_ADMIN and u["rol"] != "admin":
+                self._responder(403, '{"error":"solo admin"}')
                 return
             url, tipo, dur = "", "", 10
             if accion == "reproducir":

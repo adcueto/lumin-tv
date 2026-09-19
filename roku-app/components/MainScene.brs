@@ -773,26 +773,54 @@ sub manejarComando(datos as object)
 end sub
 
 ' B5a: comando "recargar" del panel. Equivale a volver a abrir la app sin
-' tocar la TV: se olvidan los bloqueos y fallos, se pide la lista de
-' inmediato y se vuelve a empezar desde el primer elemento.
+' tocar la TV. Revision R2 (B5A-QA-02): la reproduccion se REINICIA AQUI, de
+' inmediato, con la ultima lista que la escena ya tiene; la consulta al
+' servidor que se pide despues es un refresco, no una condicion. Asi da igual
+' que la respuesta siguiente sea identica (no dispara el observador), distinta
+' (reconstruye otra vez, como cualquier cambio de lista) o que no haya red.
 sub recargar()
     m.timerFoto.control = "stop"
     m.timerBuffer.control = "stop"
     m.timerReintento.control = "stop"
+    m.timerRespaldo.control = "stop"
     m.video.control = "stop"
     m.fallosPorUrl = {}
     m.bloqueadasHasta = {}
     m.fallosSeguidos = 0
     m.cacheInservibleVideo = 0
-    m.playlistActual = ""      ' la siguiente lista se trata como nueva
-    m.indice = 0
     m.fotoRapida = false
+    m.esperaRespaldo = 10
     m.estado.text = ""
     m.estadoTv.e = ""
     m.estadoTv.et = 0
     publicarEstado()
+
+    datos = ultimaListaConocida()
+    if datos <> invalid and datos.videos <> invalid
+        ' misma lista => misma huella: una respuesta identica no vuelve a
+        ' reconstruir; una distinta si, por el camino normal de onPlaylistJson
+        m.playlistActual = FormatJson(datos.videos)
+        if m.enRespaldo then ocultarRespaldo()
+        reconstruirSegmentos(datos)
+    else
+        ' nunca hubo lista (ni en vivo ni en cache): lamina hasta que llegue
+        m.playlistActual = ""
+        m.segmentos = []
+        mostrarRespaldo("recargando")
+    end if
     m.task.consultarAhora = m.task.consultarAhora + 1
 end sub
+
+' La ultima lista que la escena conoce: la ultima en vivo o, si arranco sin
+' red, la guardada en cache que sigue en m.task.playlistJson.
+function ultimaListaConocida() as object
+    if m.ultimosDatos <> invalid then return m.ultimosDatos
+    j = m.task.playlistJson
+    if j = invalid or j = "" then return invalid
+    d = ParseJson(j)
+    if d = invalid or d.videos = invalid then return invalid
+    return d
+end function
 
 ' ---------- Reproduccion de video ----------
 
@@ -1212,6 +1240,9 @@ function orientacionGuardada() as object
 end function
 
 sub guardarOrientacion(datos as object)
+    ' Arnes fuera del dispositivo (roku-app/pruebas/escena.brs): brs no tiene
+    ' registro. En la TV m.sinRegistro no existe nunca.
+    if m.sinRegistro = true then return
     v = "1"
     if datos.vertical <> true then v = "0"
     g = "horario"

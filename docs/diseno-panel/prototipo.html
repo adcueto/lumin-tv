@@ -10,7 +10,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font:14px/1.5 "Poppins",system-ui,sans-serif;color:var(--tinta);background:var(--fondo)}
 a{color:inherit;text-decoration:none}
-.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
 .lat{background:var(--blanco);border-right:1px solid var(--borde);padding:18px 14px;display:flex;flex-direction:column;gap:4px}
 .marca{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
 .marca .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--rosa),var(--dorado))}
@@ -23,7 +23,7 @@ a{color:inherit;text-decoration:none}
 .nav a .n{margin-left:auto;background:var(--rosa-fuerte);color:#fff;border-radius:20px;font-size:10.5px;padding:0 7px;font-weight:600}
 .yo{margin-top:auto;padding:10px;border-top:1px solid var(--borde);font-size:12px;color:var(--gris)}
 .yo b{display:block;color:var(--tinta);font-size:13px}
-main{padding:22px 28px 90px;max-width:1180px}
+main{padding:22px 28px 90px;max-width:1180px;min-width:0}
 .cab{display:flex;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap}
 .cab h1{font-size:22px;font-weight:600}
 .suc{margin-left:auto;display:flex;gap:8px;align-items:center;background:var(--blanco);border:1px solid var(--borde);border-radius:12px;padding:6px 12px;font-weight:500}
@@ -76,7 +76,10 @@ td{padding:10px;border-bottom:1px solid var(--borde);vertical-align:middle}
 .mini .txt b{font-size:12.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini .txt small{color:var(--gris);font-size:11px}
 .drop{border:2px dashed #E4C9D3;border-radius:14px;padding:22px;text-align:center;color:var(--gris);margin-bottom:14px;background:#FFFBFC}
-.dos{display:grid;grid-template-columns:300px 1fr;gap:16px}
+.dos{display:grid;grid-template-columns:300px minmax(0,1fr);gap:16px}
+.dos>div{min-width:0}
+.lista>div:last-child{min-width:0;flex:1}
+.lista small{white-space:normal}
 .lista{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:1px solid var(--borde);margin-bottom:8px;background:var(--blanco)}
 .lista.on{border-color:var(--rosa);background:var(--hover)}
 .lista b{font-size:13.5px}
@@ -84,7 +87,9 @@ td{padding:10px;border-bottom:1px solid var(--borde);vertical-align:middle}
 .item{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--borde);border-radius:12px;margin-bottom:8px;background:var(--blanco)}
 .item .h{color:#bbb;cursor:grab;font-size:18px}
 .item .th{width:40px;height:56px;border-radius:8px;background:linear-gradient(160deg,#F3D9E2,#E9C7A6);flex:none}
-.item .d{flex:1}
+.item .d{flex:1;min-width:0}
+.item .btn.ic{flex:none;min-width:34px}
+.item .chip{flex:none}
 .item .d b{font-size:13px}
 .item .d small{display:block;color:var(--gris);font-size:11.5px}
 .item input{width:56px;border:1px solid var(--borde);border-radius:8px;padding:4px 6px;font:inherit;font-size:12px;text-align:center}
@@ -94,7 +99,7 @@ td{padding:10px;border-bottom:1px solid var(--borde);vertical-align:middle}
 .dest{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
 .dest .op{text-align:center;padding:10px 6px}
 .dest .op small{display:block;font-weight:400;color:var(--gris);font-size:11px}
-.recientes{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.recientes{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;max-width:100%;-webkit-overflow-scrolling:touch}
 .recientes .mini{flex:0 0 120px}
 .msgbox{width:100%;border:1px solid var(--borde);border-radius:12px;padding:10px 12px;font:inherit;min-height:64px;color:#333}
 .big{width:100%;padding:14px;border-radius:14px;font-size:16px;margin-top:8px}
@@ -110,8 +115,25 @@ td{padding:10px;border-bottom:1px solid var(--borde);vertical-align:middle}
 .tabs a.on{color:var(--rosa-fuerte);font-weight:600}
 .pie-nota{font-size:11.5px;color:var(--gris);margin-top:6px}
 .etq{position:fixed;top:10px;right:10px;background:var(--dorado);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;z-index:9}
+.tabla-scroll{overflow-x:auto;max-width:100%}
+.tabla-scroll table{min-width:720px}
+.tabla-scroll .nota-scroll{display:none}
+.mini .txt b{max-width:100%}
+.item .d b,.lista b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.repro{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 4px}
+.repro .op{padding:6px 10px;font-size:12.5px}
+.repro .op.grp{border-style:dashed}
+.entrega{font-size:11.5px;color:var(--gris);display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.entrega span:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:#ccc;vertical-align:middle}
+.entrega .env:before{background:var(--ambar)}.entrega .rec:before{background:#5AA9E6}.entrega .rep:before{background:var(--exito)}.entrega .con:before{background:var(--error)}
 @media (max-width:700px){
   .app{grid-template-columns:1fr}
+  .tabla-scroll .nota-scroll{display:block;font-size:11px;color:var(--gris);margin-bottom:6px}
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .dest{grid-template-columns:repeat(3,1fr)}
+  .mini{flex-basis:112px}
+  .recientes .mini{flex:0 0 112px}
+  .cab .btn{margin-left:0}
   .lat{display:none}
   main{padding:14px 14px 90px}
   .tiles{grid-template-columns:repeat(2,1fr)}
@@ -181,7 +203,8 @@ section{display:none}section.on{display:block}
     <h2>Pendiente de aprobación <small>1 pantalla nueva se está anunciando</small></h2>
     <div class="fila"><div class="num off">?</div><div class="info"><b>Código en la TV: 483 921</b><div class="det"><span class="pto on"></span> en línea · Roku Express · vista hace 3 s</div></div><div class="acc"><button class="btn p">Aprobar como P6 en…</button><button class="btn">Ignorar</button></div></div>
   </div>
-  <div class="card">
+  <div class="card tabla-scroll">
+    <div class="nota-scroll">Desliza a los lados para ver toda la fila →</div>
     <table>
       <tr><th>#</th><th>Zona</th><th>Estado</th><th>Lista</th><th>Turnos</th><th>Equipo</th><th></th></tr>
       <tr><td><span class="num">1</span></td><td><b>Entrada</b></td><td><span class="pto on"></span> en línea · ▶ promo-otono.mp4</td><td><span class="chip aire">Lista al aire</span></td><td><span class="sw"></span></td><td style="color:var(--gris)">Roku Express 4K · 5.2.61 · 192.168.1.50</td><td><div class="acc"><button class="btn ic">❚❚</button><button class="btn ic">🔇</button><button class="btn ic" title="Recargar">↻</button><button class="btn ic" title="Vaciar cache">⌫</button><button class="btn ic">⋯</button></div></td></tr>
@@ -276,12 +299,19 @@ section{display:none}section.on{display:block}
   <div class="dos">
     <div>
       <div class="lista on"><div class="num" style="background:#FFF4D6;color:#8A6400">★</div><div><b>Lista al aire</b><small>base de la sucursal · 6 elementos · 4:12 · en P1, P3, P4, P5</small></div></div>
-      <div class="lista"><div class="num">2</div><div><b>Otoño</b><small>5 elementos · 3:40 · en P2 · 1 archivo falta</small></div></div>
+      <div class="lista"><div class="num">2</div><div><b>Otoño</b><small>5 elementos · 3:40 · reproduce en P2 · 1 archivo falta</small></div></div>
       <div class="lista"><div class="num off">3</div><div><b>Navidad 2025</b><small>8 elementos · sin asignar · programada del 1 al 31 dic</small></div></div>
       <button class="btn" style="width:100%">＋ Nueva lista</button>
     </div>
     <div class="card">
-      <h2>Lista al aire <small>lo que ve una pantalla que no tiene lista propia</small><button class="btn" style="margin-left:auto">Probar en P1</button></h2>
+      <h2>Lista al aire <small>lo que ve una pantalla que no tiene lista propia</small></h2>
+      <div class="pie-nota" style="margin:0 0 4px"><b style="color:var(--tinta)">Reproducir en…</b> pantallas o grupos de esta sucursal</div>
+      <div class="repro">
+        <div class="op on">P1 Entrada</div><div class="op">P2 Sala 1</div><div class="op on">P3 Recepción</div><div class="op on">P4 Sala 2</div><div class="op on">P5 Caja</div>
+        <div class="op grp on">Grupo: Salas (P2, P4)</div><div class="op grp">Grupo: Con turnos (P3, P5)</div><div class="op grp">＋ grupo</div>
+      </div>
+      <div class="pie-nota">Destino efectivo: <b>P1, P3, P4, P5</b> (P2 tiene lista propia “Otoño”, que manda). Si una pantalla está en dos listas, gana la lista propia; después, la programada; al final, la lista al aire.</div>
+      <div class="entrega"><span class="rep">P1 reproduciendo</span><span class="rec">P4 recibida 12:41</span><span class="env">P5 enviada, sin confirmar</span><span class="con">P3 sin conexión desde 11:20</span></div>
       <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>promo-otono.mp4</b><small>video · 0:45</small></div><span class="chip">girado</span><button class="btn ic peligro">✕</button></div>
       <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>imagen-promo.jpg</b><small>foto · segundos en pantalla</small></div><input value="10"><button class="btn ic peligro">✕</button></div>
       <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>tinte-balayage.mp4</b><small>video · 0:32</small></div><button class="btn ic peligro">✕</button></div>
@@ -289,7 +319,7 @@ section{display:none}section.on{display:block}
       <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>precios-unas.jpg</b><small>foto</small></div><input value="8"><button class="btn ic peligro">✕</button></div>
       <div class="item"><span class="h">⋮⋮</span><div class="th"></div><div class="d"><b>keratina.mp4</b><small>video · 1:10</small></div><button class="btn ic peligro">✕</button></div>
       <button class="btn" style="width:100%">＋ Agregar de la biblioteca</button>
-      <div class="pie-nota">Cada pantalla empieza en un punto distinto de la lista para que no vayan todas iguales. Los cambios llegan a las TVs en menos de 10 s; aquí se confirma cuándo cada una la recibió.</div>
+      <div class="pie-nota">Cada pantalla empieza en un punto distinto de la lista para que no vayan todas iguales. Estados de entrega: <b>enviada</b> (guardada en el servidor), <b>recibida</b> (la TV la pidió en su latido) y <b>reproduciendo</b> (la TV confirmó que la está mostrando). El tiempo hasta cada estado se mide, no se promete.</div>
     </div>
   </div>
 </section>
@@ -303,7 +333,8 @@ section{display:none}section.on{display:block}
 <!-- ============================ USUARIOS Y PERMISOS ============================ -->
 <section id="ajustes">
   <div class="cab"><h1>Usuarios y permisos</h1><button class="btn p" style="margin-left:auto">＋ Invitar</button></div>
-  <div class="card">
+  <div class="card tabla-scroll">
+    <div class="nota-scroll">Desliza a los lados para ver toda la fila →</div>
     <table>
       <tr><th>Usuario</th><th>Rol</th><th>Sucursales que puede operar</th><th>Último acceso</th><th></th></tr>
       <tr><td><b>Adrián</b><br><small style="color:var(--gris)">adrian@…</small></td><td><span class="chip rosa">administrador</span></td><td><span class="chip">todas</span></td><td>hoy 12:40</td><td><button class="btn ic">⋯</button></td></tr>

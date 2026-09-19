@@ -54,8 +54,11 @@ jobs:
         with:
           node-version: "20"
       - run: npm install -g @rokucommunity/brs@0.47.6 brighterscript@0.73.5
-      - name: arnés de planificación (código real de CacheTask.brs)
-        run: python3 roku-app/pruebas/correr.py | tee roku-planificacion.txt
+      - name: arneses brs (CacheTask.brs y MainScene.brs reales)
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 roku-app/pruebas/correr.py | tee roku-planificacion.txt
       - name: BrighterScript, 0 diagnósticos
         working-directory: roku-app
         run: |
@@ -102,8 +105,8 @@ jobs:
       - name: pytest servidor/ensayos_b3
         working-directory: servidor
         run: python -m pytest ensayos_b3 -q -rs --junitxml=../ensayos-b3-junit.xml
-      - name: sin omitidos (39 ensayos deben ejecutarse)
-        run: python .github/scripts/sin_omitidos.py ensayos-b3-junit.xml --minimo 39
+      - name: sin omitidos (46 ensayos deben ejecutarse)
+        run: python .github/scripts/sin_omitidos.py ensayos-b3-junit.xml --minimo 46
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -59,6 +59,10 @@ def preparar_base() -> None:
         c.execute("GRANT pg_signal_backend, pg_read_all_stats TO lumin_migracion")
         c.execute(f"DROP DATABASE IF EXISTS {BASE} WITH (FORCE)")
         c.execute(f"CREATE DATABASE {BASE} OWNER lumin_migracion")
+        # Sin CONNECT para PUBLIC: solo los tres roles entran, y el drenaje del
+        # corte puede cerrar la puerta a lumin_app con un REVOKE (B3-R4-01).
+        c.execute(f"REVOKE CONNECT ON DATABASE {BASE} FROM PUBLIC")
+        c.execute(f"GRANT CONNECT ON DATABASE {BASE} TO lumin_migracion, lumin_app, lumin_espejo")
     with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
         c.execute(DDL.read_text(encoding="utf-8"))
         c.execute("INSERT INTO empresa (id, clave, estado, heredada) VALUES (%s, 'lumin', 'activa', true), (%s, 'otra', 'suspendida', false)",

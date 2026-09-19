@@ -24,7 +24,7 @@ from pathlib import Path
 import psycopg
 import pytest
 
-from comun import USUARIO_1, contexto, dsn_rol, preparar_base
+from comun import BASE, USUARIO_1, contexto, dsn_rol, preparar_base
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
 from arnes import Servidor  # noqa: E402  (servidor 6.10 real en un directorio temporal)
@@ -80,22 +80,58 @@ class ReversionBloqueada(Exception):
     pass
 
 
+class DrenajeIncompleto(ReversionBloqueada):
+    pass
+
+
+def cerrar_entrada_lumin_app(conn) -> None:
+    """Paso 1 del drenaje: ningun escritor nuevo. REVOKE CONNECT impide
+    conexiones nuevas de lumin_app; las ya abiertas se tratan en el paso 2."""
+    conn.execute(f"REVOKE CONNECT ON DATABASE {BASE} FROM lumin_app")
+
+
+def reabrir_entrada_lumin_app(conn) -> None:
+    conn.execute(f"GRANT CONNECT ON DATABASE {BASE} TO lumin_app")
+
+
+def _backends_app(cur):
+    """Conexiones de lumin_app y si cada una puede todavia confirmar algo."""
+    return cur.execute(
+        "SELECT pid, state, backend_xid IS NOT NULL OR state LIKE 'idle in transaction%%' OR state = 'active' "
+        "FROM pg_stat_activity WHERE usename = 'lumin_app' AND pid <> pg_backend_pid()").fetchall()
+
+
 def drenar_lumin_app(timeout_s: float = 30.0) -> None:
-    """Antes de la última verificación: ninguna transacción de lumin_app en
-    vuelo. Espera hasta timeout_s y después cancela (pg_signal_backend)."""
+    """Drenaje rev. 5 (B3-R4-01). Contrato:
+      1. cerrar la entrada (REVOKE CONNECT): nadie nuevo;
+      2. esperar hasta timeout_s a que NINGUNA conexion de lumin_app tenga una
+         transaccion capaz de confirmar (activa, idle in transaction o con xid);
+      3. al agotar el plazo, TERMINAR esas conexiones (pg_terminate_backend):
+         una sesion terminada hace rollback, nunca commit; cancelar la consulta
+         no bastaba (idle in transaction no tiene consulta que cancelar);
+      4. volver a comprobar: si aun queda una conexion con transaccion, el
+         drenaje es incompleto y la reversion se BLOQUEA.
+    La entrada se reabre solo si el llamador lo pide (tras revertir o abortar)."""
     import time as _t
     with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        cerrar_entrada_lumin_app(c)
+        cur = c.cursor()
         fin = _t.monotonic() + timeout_s
-        while True:
-            vivas = [r[0] for r in c.execute(
-                "SELECT pid FROM pg_stat_activity WHERE usename = 'lumin_app' AND state <> 'idle' AND pid <> pg_backend_pid()")]
-            if not vivas:
-                return
-            if _t.monotonic() >= fin:
-                for pid in vivas:
-                    c.execute("SELECT pg_cancel_backend(%s)", (pid,))
+        while _t.monotonic() < fin:
+            if not any(peligrosa for _, _, peligrosa in _backends_app(cur)):
                 return
             _t.sleep(0.05)
+        for pid, _, peligrosa in _backends_app(cur):
+            if peligrosa:
+                cur.execute("SELECT pg_terminate_backend(%s)", (pid,))
+        # pg_terminate_backend es asincrono: esperar a que desaparezcan
+        fin2 = _t.monotonic() + 5.0
+        while _t.monotonic() < fin2:
+            restantes = [pid for pid, _, peligrosa in _backends_app(cur) if peligrosa]
+            if not restantes:
+                return
+            _t.sleep(0.05)
+        raise DrenajeIncompleto(f"conexiones con transaccion viva tras terminar: {restantes}")
 
 
 def revertir(congelado: dict, destino: Path, *, emergencia_autorizada: bool = False, dsn_espejo: str | None = None) -> dict:
@@ -109,11 +145,13 @@ def revertir(congelado: dict, destino: Path, *, emergencia_autorizada: bool = Fa
     archivo exportado, cuya vigencia no se puede comprobar.
     """
     try:
-        drenar_lumin_app(timeout_s=1.0)
+        drenar_lumin_app(timeout_s=1.0)          # DrenajeIncompleto => ReversionBloqueada
         with psycopg.connect(dsn_espejo or dsn_rol("lumin_espejo"), connect_timeout=2) as c:
             c.execute("SELECT 1")
         sesiones = regenerar_sesiones(congelado)
         motivo = "verificado contra PostgreSQL tras drenar"
+    except DrenajeIncompleto:
+        raise
     except (psycopg.OperationalError, ReversionBloqueada):
         if not emergencia_autorizada:
             raise ReversionBloqueada("PostgreSQL inaccesible: no se puede comprobar el estado final; sin reversión automática")
@@ -255,24 +293,114 @@ def test_revertir_normal_usa_el_estado_final_no_el_ultimo_espejo(base):
         assert valida(s, c_vigente)
 
 
-def test_drenaje_espera_y_cancela_transacciones_de_app_en_vuelo(base):
-    import threading
-    listo = threading.Event()
-    cancelada = {}
-
-    def transaccion_larga():
+def _abrir_transaccion_app(evento_listo, evento_soltar, resultado, *, dormir=False):
+    """Hilo: abre una mutacion como lumin_app y la deja SIN confirmar hasta que
+    se le indique (idle in transaction) o ejecuta una consulta larga (activa)."""
+    import uuid
+    from comun import EMPRESA_A, mutar_sucursal
+    try:
         with psycopg.connect(dsn_rol("lumin_app")) as a:
-            cur = a.cursor()
-            contexto(cur, empresa=None)
-            cur.execute("SELECT count(*) FROM sucursal")   # abre la transacción
-            listo.set()
-            try:
-                cur.execute("SELECT pg_sleep(10)")
-            except psycopg.errors.QueryCanceled:
-                cancelada["si"] = True
-    h = threading.Thread(target=transaccion_larga); h.start(); listo.wait(5)
-    t0 = time.monotonic()
-    drenar_lumin_app(timeout_s=0.5)
-    h.join(5)
-    assert cancelada.get("si") is True, "la transacción en vuelo debió cancelarse al vencer el drenaje"
-    assert time.monotonic() - t0 < 5
+            mutar_sucursal(a, EMPRESA_A, "tardia-" + uuid.uuid4().hex[:6], "Tardia", confirmar=False)
+            evento_listo.set()
+            if dormir:
+                a.execute("SELECT pg_sleep(30)")
+            evento_soltar.wait(10)
+            a.commit()
+            resultado["commit"] = True
+    except Exception as e:  # noqa: BLE001 - el ensayo quiere el tipo exacto
+        resultado["error"] = type(e).__name__
+    finally:
+        evento_listo.set()
+
+
+def _cuenta_tardias():
+    with psycopg.connect(dsn_rol("lumin_migracion")) as c:
+        return c.execute("SELECT count(*) FROM sucursal WHERE clave LIKE 'tardia-%%'").fetchone()[0]
+
+
+def _reabrir():
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        reabrir_entrada_lumin_app(c)
+
+
+def test_reproduccion_r4_01_cancelar_no_impide_el_commit_tardio(base):
+    """Lo que Codex demostro: pg_cancel_backend sobre 'idle in transaction' no
+    hace nada y el commit posterior tiene exito."""
+    import threading
+    listo, soltar, res = threading.Event(), threading.Event(), {}
+    h = threading.Thread(target=_abrir_transaccion_app, args=(listo, soltar, res)); h.start(); listo.wait(5)
+    with psycopg.connect(dsn_rol("lumin_migracion"), autocommit=True) as c:
+        for (pid,) in c.execute("SELECT pid FROM pg_stat_activity WHERE usename = 'lumin_app' AND state <> 'idle'").fetchall():
+            c.execute("SELECT pg_cancel_backend(%s)", (pid,))
+        estado = c.execute("SELECT state FROM pg_stat_activity WHERE usename = 'lumin_app'").fetchone()[0]
+    assert estado == "idle in transaction"
+    soltar.set(); h.join(5)
+    assert res.get("commit") is True and _cuenta_tardias() == 1, "el commit tardio paso: el drenaje viejo era insuficiente"
+
+
+def test_drenaje_termina_idle_in_transaction_y_el_commit_tardio_falla(base):
+    import threading
+    listo, soltar, res = threading.Event(), threading.Event(), {}
+    h = threading.Thread(target=_abrir_transaccion_app, args=(listo, soltar, res)); h.start(); listo.wait(5)
+    try:
+        drenar_lumin_app(timeout_s=0.3)
+        soltar.set(); h.join(5)
+        assert res.get("commit") is not True and res.get("error"), res
+        assert _cuenta_tardias() == 0, "nada de la transaccion terminada quedo confirmado"
+    finally:
+        _reabrir()
+
+
+def test_drenaje_termina_una_consulta_activa(base):
+    import threading
+    listo, soltar, res = threading.Event(), threading.Event(), {}
+    h = threading.Thread(target=_abrir_transaccion_app, args=(listo, soltar, res), kwargs={"dormir": True}); h.start(); listo.wait(5)
+    time.sleep(0.2)   # que pg_sleep este corriendo
+    try:
+        t0 = time.monotonic()
+        drenar_lumin_app(timeout_s=0.3)
+        assert time.monotonic() - t0 < 5
+        soltar.set(); h.join(5)
+        assert res.get("commit") is not True and _cuenta_tardias() == 0
+    finally:
+        _reabrir()
+
+
+def test_drenaje_cierra_la_entrada_a_nuevos_escritores(base):
+    try:
+        drenar_lumin_app(timeout_s=0.1)   # sin nadie dentro: termina enseguida, pero la puerta queda cerrada
+        with pytest.raises(psycopg.OperationalError):
+            psycopg.connect(dsn_rol("lumin_app"), connect_timeout=2)
+    finally:
+        _reabrir()
+    psycopg.connect(dsn_rol("lumin_app"), connect_timeout=2).close()
+
+
+def test_drenaje_espera_a_una_transaccion_que_confirma_a_tiempo(base):
+    """Una transaccion que confirma dentro del plazo NO se pierde: se drena, no se mata."""
+    import threading
+    listo, soltar, res = threading.Event(), threading.Event(), {}
+    h = threading.Thread(target=_abrir_transaccion_app, args=(listo, soltar, res)); h.start(); listo.wait(5)
+    threading.Timer(0.2, soltar.set).start()
+    try:
+        drenar_lumin_app(timeout_s=3.0)
+        h.join(5)
+        assert res.get("commit") is True and _cuenta_tardias() == 1
+    finally:
+        _reabrir()
+
+
+def test_revertir_se_bloquea_si_el_drenaje_no_puede_completarse(base, monkeypatch):
+    """Si tras terminar aun quedara una transaccion viva (no deberia ocurrir en
+    PostgreSQL, pero el contrato lo cubre), revertir no escribe nada."""
+    import test_ensayo_sesiones as yo
+    def falso_drenaje(timeout_s=30.0):
+        raise DrenajeIncompleto("simulado")
+    monkeypatch.setattr(yo, "drenar_lumin_app", falso_drenaje)
+    with Servidor() as s:
+        s.login()
+        congelado = s.json("sesiones.json")
+        antes = (s.dir / "sesiones.json").read_bytes()
+        with pytest.raises(ReversionBloqueada):
+            revertir(congelado, s.dir / "sesiones.json", emergencia_autorizada=True)
+        assert (s.dir / "sesiones.json").read_bytes() == antes, "ni en emergencia se escribe con drenaje incompleto"

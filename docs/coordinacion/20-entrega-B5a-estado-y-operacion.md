@@ -6,7 +6,7 @@ Sigue la plantilla de `06-protocolo-y-qa.md`.
 
 - ID: **B5a** (adelanto de B5 "API v2 / estado real" del plan
   `10-diagnostico-y-plan-modernizacion.md`, solo la parte que no necesita
-  PostgreSQL) · Revisión **R1**
+  PostgreSQL) · Revisión **R2**
 - Responsable: Claude (desarrollo) · Revisa: Codex
 - Fecha: 2026-09-19
 - Raíz: `lumin-tv` · Rama: `modernizacion-diagnostico`
@@ -146,3 +146,26 @@ exacto, build 61.
 - Commit y push en `modernizacion-diagnostico`: realizados (push desde la
   máquina del propietario).
 - Despliegue al VPS y a las TVs de los salones: **NO realizado, no autorizado.**
+
+---
+
+## Revisión R2 — respuesta a `22-qa-B3-rev4-B5a-1f7782e.md` (Codex, 2026-09-19)
+
+Los dos hallazgos de B5a se **CONFIRMAN**. Build **62**; servidor 6.10.1 sin
+cambio de versión (solo una comprobación de permiso).
+
+| ID | Decisión | Qué cambió | Evidencia ejecutada |
+|---|---|---|---|
+| B5A-QA-01 [P1] los comandos admin no verificaban el rol en la API | **CONFIRMADO.** El botón se ocultaba; la ruta no comprobaba | `ACCIONES_SOLO_ADMIN = ("recargar", "vaciar_cache")`; `/api/tv/comando` responde **403 sin encolar** a cualquier rol distinto de `admin` para esas dos acciones; las demás conservan su contrato | `test_operador_no_puede_recargar_ni_vaciar_cache` (operador 403 en ambas, `n` no avanza, `comandos.json` sin rastro; `pausa` del operador sigue 200; admin 200) y `test_operador_de_otra_sucursal_sigue_sin_poder_mandar_comandos` (200 silencioso para `pausa` como hoy —contrato 6.x, se endurece en B4— y 403 para `recargar`; nada encolado). Suite: **28 pasan** |
+| B5A-QA-02 [P1] `recargar` dejaba la reproducción detenida si la respuesta era idéntica | **CONFIRMADO.** Dependía de un evento del campo `playlistJson` que SceneGraph no emite si el valor no cambia | `recargar()` **reinicia la reproducción en el acto** con la última lista conocida (`ultimaListaConocida()`: la última en vivo o, si arrancó sin red, la guardada); fija `m.playlistActual` a esa huella para que una respuesta idéntica no reconstruya y una distinta sí lo haga por el camino normal; la consulta al servidor pasa a ser un refresco, no una condición. Sin lista alguna → lámina "recargando" hasta que llegue | **Arnés nuevo `roku-app/pruebas/escena.brs`**: ejecuta `MainScene.brs` real con dobles de los nodos. 21 comprobaciones, 0 fallos: respuesta idéntica (arranca desde el primer elemento, olvida bloqueos, pide refresco, la respuesta idéntica no notifica y no hace falta), respuesta distinta (se aplica una sola vez más), sin internet (reproduce lo que tiene, sin lámina, reporta `k=1`), sin lista nunca (lámina y petición), el mismo `n` no vuelve a recargar. Contra el `MainScene.brs` de `1f7782e`: **4 fallos** (`control=stop`, sigue en `c.jpg`, sin lámina) |
+
+`correr.py` ejecuta ahora los dos arneses (planificación 42 + escena 21) y
+solo devuelve 0 si ambos terminan sin fallos ni errores del intérprete. El
+paso de CI usa `set -o pipefail` (recomendación de Codex). Para que el arnés
+pueda correr, `guardarOrientacion` tiene un asidero `m.sinRegistro` que en la
+TV no existe (mismo patrón que `m.simulacion` en CacheTask).
+
+Límite declarado: el arnés reproduce la semántica "sin notificación si el
+valor no cambia" **por construcción** (`llegaRespuesta` no llama a
+`onPlaylistJson` con JSON idéntico); no es SceneGraph. F22 sigue pendiente
+en equipo físico con build 62.

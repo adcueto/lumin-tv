@@ -59,15 +59,35 @@ def escribir_artefacto(ruta: Path, contenido: bytes) -> None:
     tmp.replace(ruta)
 
 
-def publicar(tid: uuid.UUID, posesion: uuid.UUID, ruta: Path) -> bool:
-    """Un solo UPDATE condicionado a la posesión vigente; guarda la ruta."""
+PUBLICADO = "publicado"          # este UPDATE publico
+YA_PUBLICADO = "ya_publicado"    # la MISMA posesion ya lo habia publicado: exito idempotente
+PERDIDO = "perdido"              # otra posesion gano, o el trabajo fue cancelado/reabierto
+
+
+def publicar(tid: uuid.UUID, posesion: uuid.UUID, ruta: Path) -> str:
+    """Rev. 5 (B3-R4-02). Un solo UPDATE condicionado a la posesion; si afecta 0
+    filas se distingue, en la MISMA transaccion, entre "ya lo publique yo"
+    (fila hecha con mi posesion y mi ruta: exito idempotente, el archivo se
+    conserva) y "perdi la posesion" (descartar lo mio)."""
     with _app() as c:
         cur = c.cursor(); contexto(cur, empresa=EMPRESA_A)
         cur.execute("UPDATE trabajo SET estado = 'hecho', terminado_en = now(), resultado = %s "
                     "WHERE id = %s AND posesion = %s AND estado = 'en_curso'", (str(ruta), tid, posesion))
-        gano = cur.rowcount == 1
+        if cur.rowcount == 1:
+            c.commit()
+            return PUBLICADO
+        fila = cur.execute("SELECT estado, posesion, resultado FROM trabajo WHERE id = %s", (tid,)).fetchone()
         c.commit()
-    return gano
+        if fila and fila[0] == "hecho" and fila[1] == posesion and fila[2] == str(ruta):
+            return YA_PUBLICADO
+        return PERDIDO
+
+
+def al_perder(resultado: str, ruta_mia: Path, posesion: uuid.UUID) -> None:
+    """Lo que hace el trabajador con el resultado de publicar. SOLO 'perdido'
+    borra; 'ya_publicado' es exito y el artefacto esta referenciado."""
+    if resultado == PERDIDO:
+        descartar_lo_mio(ruta_mia, posesion)
 
 
 def descartar_lo_mio(ruta_mia: Path, posesion: uuid.UUID) -> None:
@@ -119,8 +139,8 @@ def test_rev3_el_nombre_compartido_pierde_el_resultado(base, tmp_path):
     barrido_en_curso_vencidos(0)                    # A "vence" (latido viejo)
     tid_b, pos_b = reclamar("B")
     escribir_artefacto(ruta_compartida, b"B")       # mismo nombre
-    assert publicar(tid_b, pos_b, ruta_compartida)
-    assert not publicar(tid_a, pos_a, ruta_compartida)
+    assert publicar(tid_b, pos_b, ruta_compartida) == PUBLICADO
+    assert publicar(tid_a, pos_a, ruta_compartida) == PERDIDO
     ruta_compartida.unlink()                        # "A borra su archivo" según el contrato viejo
     assert estado(tid) == ("hecho", str(ruta_compartida)) and not ruta_compartida.exists(), \
         "hecho sin archivo: el defecto que señaló Codex"
@@ -137,9 +157,10 @@ def test_rev4_a_vencido_b_publicado_a_descartado(base, tmp_path):
     ruta_b = ruta_artefacto(tmp_path, "video", "d1", pos_b)
     assert ruta_b != ruta_a
     escribir_artefacto(ruta_b, b"B")
-    assert publicar(tid_b, pos_b, ruta_b)
-    assert not publicar(tid_a, pos_a, ruta_a)      # 0 filas: A perdió
-    descartar_lo_mio(ruta_a, pos_a)
+    assert publicar(tid_b, pos_b, ruta_b) == PUBLICADO
+    r = publicar(tid_a, pos_a, ruta_a)
+    assert r == PERDIDO                             # 0 filas y la fila es de B
+    al_perder(r, ruta_a, pos_a)
     assert estado(tid) == ("hecho", str(ruta_b))
     assert ruta_b.exists() and ruta_b.read_bytes() == b"B" and not ruta_a.exists()
     assert barrido_huerfanos(tmp_path) == []       # nada que limpiar: lo publicado se respeta
@@ -157,19 +178,60 @@ def test_rev4_caida_tras_escribir_antes_del_update(base, tmp_path):
     tid_b, pos_b = reclamar("B")
     ruta_b = ruta_artefacto(tmp_path, "video", "d1", pos_b)
     escribir_artefacto(ruta_b, b"B")
-    assert publicar(tid_b, pos_b, ruta_b)
+    assert publicar(tid_b, pos_b, ruta_b) == PUBLICADO
     assert estado(tid) == ("hecho", str(ruta_b)) and ruta_b.exists()
 
 
-def test_rev4_reintento_de_la_misma_posesion_es_idempotente(base, tmp_path):
+def test_reproduccion_r4_02_el_contrato_viejo_borraba_lo_publicado(base, tmp_path):
+    """Con la regla de la rev. 4 ("0 filas => descartar lo mio"), un reintento de
+    la misma posesion tras una confirmacion cuya respuesta se perdio borraba el
+    archivo publicado. Se reproduce con el UPDATE crudo, sin la distincion nueva."""
     tid = encolar()
     _, pos = reclamar("A")
     r1 = ruta_artefacto(tmp_path, "video", "d1", pos)
     escribir_artefacto(r1, b"A")
-    escribir_artefacto(r1, b"A")                   # reescribir es inocuo
-    assert publicar(tid, pos, r1)
-    assert not publicar(tid, pos, r1)              # publicar dos veces: la segunda no hace nada
-    assert estado(tid) == ("hecho", str(r1))
+    assert publicar(tid, pos, r1) == PUBLICADO
+    with _app() as c:                                   # el reintento "viejo": solo mira rowcount
+        cur = c.cursor(); contexto(cur, empresa=EMPRESA_A)
+        cur.execute("UPDATE trabajo SET estado = 'hecho' WHERE id = %s AND posesion = %s AND estado = 'en_curso'", (tid, pos))
+        cero_filas = cur.rowcount == 0
+        c.commit()
+    assert cero_filas
+    descartar_lo_mio(r1, pos)                            # lo que ordenaba el contrato viejo
+    assert estado(tid) == ("hecho", str(r1)) and not r1.exists(), "hecho sin archivo: B3-R4-02"
+
+
+def test_rev5_reintento_de_la_misma_posesion_es_exito_idempotente(base, tmp_path):
+    tid = encolar()
+    _, pos = reclamar("A")
+    r1 = ruta_artefacto(tmp_path, "video", "d1", pos)
+    escribir_artefacto(r1, b"A")
+    escribir_artefacto(r1, b"A")                       # reescribir es inocuo
+    assert publicar(tid, pos, r1) == PUBLICADO
+    # se perdio la respuesta: el trabajador repite el recorrido completo
+    escribir_artefacto(r1, b"A")
+    r = publicar(tid, pos, r1)
+    assert r == YA_PUBLICADO
+    al_perder(r, r1, pos)                                # no borra nada
+    assert estado(tid) == ("hecho", str(r1)) and r1.exists() and r1.read_bytes() == b"A"
+    assert barrido_huerfanos(tmp_path) == []             # el artefacto esta referenciado
+
+
+def test_rev5_reintento_tras_perder_la_posesion_sigue_descartando_lo_propio(base, tmp_path):
+    """El control de trabajador vencido de otra posesion se conserva."""
+    tid = encolar()
+    _, pos_a = reclamar("A")
+    ra = ruta_artefacto(tmp_path, "video", "d1", pos_a); escribir_artefacto(ra, b"A")
+    barrido_en_curso_vencidos(0)
+    _, pos_b = reclamar("B")
+    rb = ruta_artefacto(tmp_path, "video", "d1", pos_b); escribir_artefacto(rb, b"B")
+    assert publicar(tid, pos_b, rb) == PUBLICADO
+    r = publicar(tid, pos_a, ra)
+    assert r == PERDIDO
+    al_perder(r, ra, pos_a)
+    assert not ra.exists() and rb.exists() and estado(tid) == ("hecho", str(rb))
+    # y un reintento de B despues de eso sigue siendo exito idempotente
+    assert publicar(tid, pos_b, rb) == YA_PUBLICADO and rb.exists()
 
 
 def test_cancelar_en_curso_hace_perder_la_posesion(base, tmp_path):
@@ -180,6 +242,7 @@ def test_cancelar_en_curso_hace_perder_la_posesion(base, tmp_path):
         cur.execute("UPDATE trabajo SET estado = 'cancelado', posesion = NULL WHERE id = %s", (tid,)); c.commit()
     r = ruta_artefacto(tmp_path, "video", "d1", pos)
     escribir_artefacto(r, b"A")
-    assert not publicar(tid, pos, r)
-    descartar_lo_mio(r, pos)
+    res = publicar(tid, pos, r)
+    assert res == PERDIDO
+    al_perder(res, r, pos)
     assert estado(tid) == ("cancelado", None) and not r.exists()

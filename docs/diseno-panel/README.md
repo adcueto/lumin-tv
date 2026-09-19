@@ -16,7 +16,7 @@ generan con `capturar.py` (Playwright, Chromium) a 1366×860 (escritorio) y
 | Mostrar ahora | Recepción en celular | **Un solo flujo** para foto, video o mensaje: dónde, qué, cuánto tiempo; recientes a un toque; "Ahora mismo" lista lo que está fuera de la lista y permite quitarlo (unifica "Mostrar al cliente" y "Enviar a…") |
 | Turnos | Recepción en celular | Estado del punto de venta, turno en pantalla con tiempo restante, próximos, anuncio manual con duración; deduplicación declarada |
 | Biblioteca | Adrián | Subida con límites explícitos (80 MB por la cache de la TV), filtros, "sin usar", archivos que faltan marcados, conversión en curso, reproducciones **confirmadas** (no descargas) |
-| Listas | Adrián | Lista base + listas propias, orden arrastrable, segundos por foto, dónde está asignada, confirmación de recepción por pantalla |
+| Listas | Adrián | Lista base + listas propias, orden arrastrable, segundos por foto; **RF-26: "Reproducir en…"** con pantallas individuales y grupos de la sucursal, destino efectivo con la regla de prioridad (lista propia > programada > lista al aire) y estados de entrega por pantalla: *enviada* (guardada), *recibida* (la TV la pidió en su latido), *reproduciendo* (la TV confirmó); el tiempo se mide, no se promete |
 | Usuarios y permisos | Adrián | Permisos explícitos por sucursal; usuario sin sucursales marcado (QA-F01); rol "integración" para el POS |
 
 Navegación: las once secciones del plan (`10-…md §4.2`) en menú lateral en
@@ -27,6 +27,21 @@ bloque; aquí solo están como marcador.
 Marca: los tokens del panel actual (rosa `#EFAFC7`, rosa fuerte `#EC3A80`,
 dorado `#C8A96A`, tinta `#1F1F1F`, gris `#6B7280`, Poppins). Nada del tema
 oscuro de la TV, que es otra pieza.
+
+## Revisión 2 (respuesta a UI-QA-01 y ajustes de producto del informe 22)
+
+- **UI-QA-01** confirmado: a 360 y 390 px el documento medía 580–655 px en
+  Pantallas, Mostrar ahora, Listas y Usuarios. Corregido con
+  `minmax(0,1fr)` en la rejilla, `min-width:0` en `main` y columnas, tablas
+  anchas en un contenedor con desplazamiento propio (aviso "desliza"), tira de
+  recientes contenida. `comprobar_anchura.py` verifica que
+  `document.scrollWidth == viewport` en 360, 390 y 1366 para las once
+  secciones; sale 1 si alguna desborda. Capturas regeneradas.
+- **RF-26** incorporado en Listas (ver tabla). Es requisito pendiente de
+  implementación (BL-076–079), no funcionalidad entregada.
+- Retirada la promesa "menos de 10 s"; sustituida por los tres estados de
+  entrega medibles. "Reproducciones confirmadas" en Biblioteca depende de la
+  propuesta 7 (confirmación desde la TV), aún no implementada: es diseño.
 
 ## Supuestos que Adrián debe confirmar o corregir
 
